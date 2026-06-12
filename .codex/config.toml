@@ -1,0 +1,7 @@
+[mcp_servers.xcodebuildmcp]
+command = "./node_modules/.bin/node"
+args = ["./node_modules/xcodebuildmcp/build/cli.js"]
+cwd = "."
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+enabled = true

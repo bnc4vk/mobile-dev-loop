@@ -1,0 +1,9 @@
+{
+  "xcode": "26.4.1",
+  "iosDeploymentTarget": "17.0",
+  "node": "24.14.0",
+  "agentDevice": "0.17.3",
+  "xcodeBuildMcp": "2.6.2",
+  "agenticCodingTool": "pin-per-experiment",
+  "mockBackend": "repo-local"
+}

@@ -1,0 +1,20 @@
+{
+  "tasks": [
+    {
+      "id": "T01-clean-simulator",
+      "title": "Clean simulator control",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "none",
+      "promptFile": "experiment/public/prompts/T01-clean-simulator.md"
+    },
+    {
+      "id": "T02-clean-iphone",
+      "title": "Clean physical-iPhone control",
+      "fixture": "clean",
+      "target": "iphone",
+      "fault": "none",
+      "promptFile": "experiment/public/prompts/T02-clean-iphone.md"
+    }
+  ]
+}

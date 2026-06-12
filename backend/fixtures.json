@@ -1,0 +1,30 @@
+{
+  "clean": {
+    "accountID": "acct-clean",
+    "displayName": "Clean Account",
+    "records": ["alpha", "bravo"],
+    "banner": "Fresh fixture",
+    "shouldCrash": false
+  },
+  "empty": {
+    "accountID": "acct-empty",
+    "displayName": "Empty Account",
+    "records": [],
+    "banner": "No records fixture",
+    "shouldCrash": false
+  },
+  "stale": {
+    "accountID": "acct-stale",
+    "displayName": "Stale Account",
+    "records": ["old-record"],
+    "banner": "STALE FIXTURE",
+    "shouldCrash": false
+  },
+  "malformed": {
+    "accountID": "acct-crash",
+    "displayName": "Crash Account",
+    "records": ["bad"],
+    "banner": "Malformed fixture",
+    "shouldCrash": true
+  }
+}

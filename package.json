@@ -1,0 +1,41 @@
+{
+  "name": "mobile-dev-loop",
+  "version": "1.0.0",
+  "description": "Experiment scaffold for evaluating mobile environment coordination in agentic iOS development loops.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "doctor": "python3 harness/doctor.py",
+    "doctor:deep": "python3 harness/doctor.py --deep",
+    "metrics": "python3 harness/metrics.py",
+    "run:simulator": "python3 harness/run_task.py --task T01-clean-simulator --condition baseline",
+    "run:iphone": "python3 harness/run_task.py --task T02-clean-iphone --condition baseline",
+    "tool:agent-device": "agent-device --version",
+    "tool:xcodebuildmcp": "xcodebuildmcp --version"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bnc4vk/mobile-dev-loop.git"
+  },
+  "keywords": [
+    "ios",
+    "swiftui",
+    "agentic-coding",
+    "mobile-automation",
+    "experiment"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/bnc4vk/mobile-dev-loop/issues"
+  },
+  "homepage": "https://github.com/bnc4vk/mobile-dev-loop#readme",
+  "devDependencies": {
+    "agent-device": "^0.17.3",
+    "node": "^24.14.0",
+    "xcodebuildmcp": "^2.6.2"
+  }
+}
