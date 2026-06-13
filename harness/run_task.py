@@ -163,6 +163,7 @@ def build_iphone(worktree, run_dir, backend_url, telemetry, device_id, developme
         f"id={device_id}",
         "-derivedDataPath",
         str(derived_data),
+        "-allowProvisioningUpdates",
         f"DEVELOPMENT_TEAM={development_team}",
         "CODE_SIGN_STYLE=Automatic",
         "build",
