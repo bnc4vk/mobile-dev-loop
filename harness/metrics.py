@@ -41,6 +41,8 @@ def command_label(command):
         return "install"
     if "devicectl device process launch" in joined:
         return "launch"
+    if "agent-device" in joined and " prepare ios-runner " in joined:
+        return "agent_device_prepare_ios_runner"
     if "agent-device" in joined and " open " in joined:
         return "agent_device_open"
     if "agent-device" in joined and " screenshot " in joined:

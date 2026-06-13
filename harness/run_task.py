@@ -221,7 +221,16 @@ def install_launch_iphone(app, backend_url, telemetry, device_id, run_dir):
     return device_id
 
 
-def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url):
+def agent_device_env(target, development_team=None):
+    env = os.environ.copy()
+    if target == "iphone":
+        if development_team:
+            env.setdefault("AGENT_DEVICE_IOS_TEAM_ID", development_team)
+        env.setdefault("AGENT_DEVICE_IOS_BUNDLE_ID", "com.mobiledevloop.agentdevice.runner")
+    return env
+
+
+def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, development_team=None):
     evidence_dir = run_dir / "evidence"
     state_dir = run_dir / "agent-device-state"
     evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -229,13 +238,20 @@ def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend
     screenshot = evidence_dir / "agent-device-screenshot.png"
     snapshot = evidence_dir / "agent-device-snapshot.txt"
     common = [str(AGENT_DEVICE), "--state-dir", str(state_dir), "--platform", "ios", "--udid", device_id, "--session", run_dir.name]
+    env = agent_device_env(target, development_team)
 
-    run(common + ["close"], telemetry, check=False, timeout=60)
-    open_proc = run(common + ["open", "com.mobiledevloop.LoopLab", "--relaunch", "--launch-args", f"--backend-url={backend_url}", "--json"], telemetry, check=False, timeout=120)
+    run(common + ["close"], telemetry, env=env, check=False, timeout=60)
+    if target == "iphone":
+        run(common + ["prepare", "ios-runner", "--timeout", "240000", "--json"], telemetry, env=env, check=False, timeout=300)
+    open_cmd = common + ["open", "com.mobiledevloop.LoopLab"]
+    if target != "iphone":
+        open_cmd.append("--relaunch")
+    open_cmd += ["--launch-args", f"--backend-url={backend_url}", "--json"]
+    open_proc = run(open_cmd, telemetry, env=env, check=False, timeout=120)
     time.sleep(0.5)
-    screenshot_proc = run(common + ["screenshot", str(screenshot), "--json"], telemetry, check=False, timeout=120)
-    snapshot_proc = run(common + ["snapshot"], telemetry, check=False, timeout=120)
-    close_proc = run(common + ["close"], telemetry, check=False, timeout=60)
+    screenshot_proc = run(common + ["screenshot", str(screenshot), "--json"], telemetry, env=env, check=False, timeout=120)
+    snapshot_proc = run(common + ["snapshot"], telemetry, env=env, check=False, timeout=120)
+    close_proc = run(common + ["close"], telemetry, env=env, check=False, timeout=60)
     if snapshot_proc.stdout:
         snapshot.write_text(snapshot_proc.stdout, encoding="utf-8")
 
@@ -330,7 +346,7 @@ def main():
         else:
             app = build_iphone(worktree, run_dir, backend_url, telemetry, args.device_id, args.development_team)
             device_id = install_launch_iphone(app, backend_url, telemetry, args.device_id, run_dir)
-            capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url)
+            capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, args.development_team)
 
         manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": git_head(ROOT), "toolLock": tool_lock})
         telemetry.emit("run_finished", manifest=str(manifest))
