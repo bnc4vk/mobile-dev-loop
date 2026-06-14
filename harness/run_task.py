@@ -196,6 +196,29 @@ def coordinator_postflight(run_dir, telemetry, condition, check=True):
     return output
 
 
+def coordinator_observation_decision(run_dir, telemetry, condition):
+    if condition != "candidate":
+        return "baseline"
+    output = coordinator_manifest_path(run_dir)
+    run(
+        [
+            sys.executable,
+            str(COORDINATOR),
+            "decide-observation",
+            str(run_dir),
+            "--output",
+            str(output),
+        ],
+        telemetry,
+        timeout=60,
+    )
+    manifest = json.loads(output.read_text(encoding="utf-8"))
+    decision = manifest.get("activeObservationDecision", {})
+    action = decision.get("action") or "relaunch"
+    telemetry.emit("coordinator_observation_decision", path=str(output), action=action, reason=decision.get("reason"))
+    return action
+
+
 def start_backend(task, run_dir, telemetry, target, fault_profile):
     port = free_port()
     bind_host = "0.0.0.0" if target == "iphone" else "127.0.0.1"
@@ -466,7 +489,7 @@ def capture_extra_agent_device_evidence(common, env, run_dir, telemetry, task):
     return extra
 
 
-def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, development_team=None, fault_profile=None):
+def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, development_team=None, fault_profile=None, observation_transition="baseline"):
     fault_profile = fault_profile or {"id": "none"}
     evidence_dir = run_dir / "evidence"
     state_dir = run_dir / "agent-device-state"
@@ -503,6 +526,7 @@ def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend
         screenshot=str(screenshot) if screenshot.exists() else None,
         snapshot=str(snapshot) if snapshot.exists() else None,
         openExitCode=open_proc.returncode,
+        observationTransition=observation_transition,
         screenshotExitCode=screenshot_proc.returncode,
         snapshotExitCode=snapshot_proc.returncode,
         closeExitCode=close_proc.returncode,
@@ -592,11 +616,19 @@ def main():
         if target == "simulator":
             app = build_simulator(worktree, run_dir, backend_url, telemetry)
             device_id, _ = install_launch_simulator(app, backend_url, telemetry, run_dir, fault_profile)
-            capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, fault_profile=fault_profile)
+            observation_transition = coordinator_observation_decision(run_dir, telemetry, args.condition)
+            if observation_transition == "reuse-observation":
+                telemetry.emit("agent_device_evidence_reused", target=target, deviceId=device_id)
+            else:
+                capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, fault_profile=fault_profile, observation_transition=observation_transition)
         else:
             app = build_iphone(worktree, run_dir, backend_url, telemetry, args.device_id, args.development_team)
             device_id = install_launch_iphone(app, backend_url, telemetry, args.device_id, run_dir, fault_profile)
-            capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, args.development_team, fault_profile)
+            observation_transition = coordinator_observation_decision(run_dir, telemetry, args.condition)
+            if observation_transition == "reuse-observation":
+                telemetry.emit("agent_device_evidence_reused", target=target, deviceId=device_id)
+            else:
+                capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, args.development_team, fault_profile, observation_transition)
 
         manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": source_head, "status": "completed", "toolLock": tool_lock, "limits": limits})
         telemetry.emit("run_finished", manifest=str(manifest))

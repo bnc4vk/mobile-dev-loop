@@ -9,4 +9,4 @@ The first coordinator surface is intentionally passive:
 - recommend the next transition among `reuse-observation`, `relaunch`, `reinstall`, `rebuild`, and `reset`;
 - emit a machine-readable coordinator manifest for later candidate integration.
 
-It does not yet recover state, mutate devices, or enable candidate experiment runs.
+Current active behavior is limited to the observation transition. Candidate runs ask the coordinator whether to `reuse-observation` or `relaunch` before `agent-device` evidence capture. On physical iPhone runs, `relaunch` is satisfied by the harness' preceding `devicectl launch --terminate-existing` step and the `agent-device open` call attaches without its own `--relaunch` flag. The coordinator does not yet choose rebuild, reinstall, reset, or fixture restoration actions.

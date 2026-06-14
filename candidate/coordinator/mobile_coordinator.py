@@ -157,8 +157,49 @@ def merge_postflight(args):
     return existing
 
 
+def evidence_is_trustworthy(run_dir):
+    metrics = load_json(run_dir / "metrics.json")
+    if metrics and runtime_health(metrics) == "healthy":
+        return True
+
+    events = load_jsonl(run_dir / "telemetry.jsonl")
+    evidence = latest(events, "agent_device_evidence_captured")
+    if not evidence:
+        return False
+    screenshot = evidence.get("screenshot")
+    snapshot = evidence.get("snapshot")
+    return bool(
+        screenshot
+        and snapshot
+        and Path(screenshot).exists()
+        and Path(snapshot).exists()
+        and evidence.get("openExitCode") == 0
+        and evidence.get("screenshotExitCode") == 0
+        and evidence.get("snapshotExitCode") == 0
+    )
+
+
+def decide_observation(args):
+    manifest = load_json(args.output)
+    if evidence_is_trustworthy(args.run_dir):
+        decision = {
+            "phase": "before-observation",
+            "action": "reuse-observation",
+            "reason": "trustworthy evidence already exists in this run directory",
+        }
+    else:
+        decision = {
+            "phase": "before-observation",
+            "action": "relaunch",
+            "reason": "no trustworthy evidence exists in this run directory",
+        }
+    manifest.setdefault("decisions", []).append(decision)
+    manifest["activeObservationDecision"] = decision
+    return manifest
+
+
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] not in {"preflight", "postflight", "inspect", "-h", "--help"}:
+    if len(sys.argv) > 1 and sys.argv[1] not in {"preflight", "decide-observation", "postflight", "inspect", "-h", "--help"}:
         sys.argv.insert(1, "inspect")
 
     parser = argparse.ArgumentParser()
@@ -180,6 +221,10 @@ def main():
     postflight.add_argument("run_dir", type=Path)
     postflight.add_argument("--output", type=Path, required=True)
 
+    decide = subparsers.add_parser("decide-observation")
+    decide.add_argument("run_dir", type=Path)
+    decide.add_argument("--output", type=Path, required=True)
+
     inspect = subparsers.add_parser("inspect")
     inspect.add_argument("run_dir", type=Path)
     inspect.add_argument("--output", type=Path)
@@ -192,6 +237,11 @@ def main():
         return
     if args.command == "postflight":
         payload = merge_postflight(args)
+        write_json(args.output, payload)
+        print(args.output)
+        return
+    if args.command == "decide-observation":
+        payload = decide_observation(args)
         write_json(args.output, payload)
         print(args.output)
         return
