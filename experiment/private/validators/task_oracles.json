@@ -1,0 +1,38 @@
+{
+  "tasks": {
+    "T01-clean-simulator": {
+      "oracle": "scripted-clean-control-v1",
+      "expectedTarget": "simulator",
+      "expectedFixture": "clean",
+      "requiredSnapshotText": [
+        "Clean Account",
+        "Fresh fixture",
+        "alpha",
+        "bravo"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded"
+      ]
+    },
+    "T02-clean-iphone": {
+      "oracle": "scripted-clean-control-v1",
+      "expectedTarget": "iphone",
+      "expectedFixture": "clean",
+      "requiredSnapshotText": [
+        "Clean Account",
+        "Fresh fixture",
+        "alpha",
+        "bravo"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded"
+      ],
+      "forbiddenBackendUrlText": [
+        "127.0.0.1",
+        "localhost"
+      ]
+    }
+  }
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -11,6 +12,7 @@ class FixtureServer(BaseHTTPRequestHandler):
     failure_mode = "none"
 
     def do_GET(self):
+        print(json.dumps({"event": "request", "client": self.client_address[0], "path": self.path}), flush=True)
         if self.path == "/health":
             self._send_json({"ok": True, "fixture": self.fixture_name, "failure": self.failure_mode})
             return
@@ -28,7 +30,7 @@ class FixtureServer(BaseHTTPRequestHandler):
         self.end_headers()
 
     def log_message(self, fmt, *args):
-        return
+        print(json.dumps({"event": "http_log", "client": self.client_address[0], "message": fmt % args}), file=sys.stderr, flush=True)
 
     def _send_json(self, payload):
         encoded = json.dumps(payload, sort_keys=True).encode("utf-8")

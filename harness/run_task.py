@@ -61,6 +61,20 @@ def free_port():
     return port
 
 
+def physical_device_backend_host():
+    for interface in ("en0", "en1"):
+        proc = subprocess.run(["ipconfig", "getifaddr", interface], text=True, capture_output=True)
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.strip()
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("8.8.8.8", 80))
+        return sock.getsockname()[0]
+    finally:
+        sock.close()
+
+
 def load_task(task_id):
     tasks = json.loads(TASKS.read_text())["tasks"]
     for task in tasks:
@@ -88,12 +102,16 @@ def create_worktree(run_dir, telemetry):
     return worktree
 
 
-def start_backend(task, run_dir, telemetry):
+def start_backend(task, run_dir, telemetry, target):
     port = free_port()
+    bind_host = "0.0.0.0" if target == "iphone" else "127.0.0.1"
+    url_host = physical_device_backend_host() if target == "iphone" else "127.0.0.1"
     log_path = run_dir / "backend.log"
     cmd = [
         sys.executable,
         str(ROOT / "backend" / "mock_backend.py"),
+        "--host",
+        bind_host,
         "--port",
         str(port),
         "--fixture",
@@ -115,8 +133,8 @@ def start_backend(task, run_dir, telemetry):
     else:
         proc.terminate()
         raise RuntimeError(f"backend did not become ready; see {log_path}")
-    telemetry.emit("backend_started", pid=proc.pid, port=port, fixture=task["fixture"], log=str(log_path))
-    return proc, f"http://127.0.0.1:{port}"
+    telemetry.emit("backend_started", pid=proc.pid, port=port, bindHost=bind_host, urlHost=url_host, fixture=task["fixture"], log=str(log_path))
+    return proc, f"http://{url_host}:{port}"
 
 
 def build_simulator(worktree, run_dir, backend_url, telemetry):
@@ -221,8 +239,9 @@ def install_launch_iphone(app, backend_url, telemetry, device_id, run_dir):
     return device_id
 
 
-def agent_device_env(target, development_team=None):
+def agent_device_env(target, run_dir, development_team=None):
     env = os.environ.copy()
+    env.setdefault("AGENT_DEVICE_IOS_RUNNER_LEASE_DIR", str(run_dir / "agent-device-runner-leases"))
     if target == "iphone":
         if development_team:
             env.setdefault("AGENT_DEVICE_IOS_TEAM_ID", development_team)
@@ -238,7 +257,7 @@ def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend
     screenshot = evidence_dir / "agent-device-screenshot.png"
     snapshot = evidence_dir / "agent-device-snapshot.txt"
     common = [str(AGENT_DEVICE), "--state-dir", str(state_dir), "--platform", "ios", "--udid", device_id, "--session", run_dir.name]
-    env = agent_device_env(target, development_team)
+    env = agent_device_env(target, run_dir, development_team)
 
     run(common + ["close"], telemetry, env=env, check=False, timeout=60)
     if target == "iphone":
@@ -334,7 +353,7 @@ def main():
             return
 
         worktree = create_worktree(run_dir, telemetry)
-        backend, backend_url = start_backend(task, run_dir, telemetry)
+        backend, backend_url = start_backend(task, run_dir, telemetry, target)
 
         if args.execute_agent:
             execute_codex(task, worktree, run_dir, telemetry)
