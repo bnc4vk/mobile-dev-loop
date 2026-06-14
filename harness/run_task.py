@@ -816,9 +816,19 @@ def write_manifest(run_dir, manifest):
     return path
 
 
-def execute_codex(task, worktree, run_dir, telemetry, limits):
+def execute_codex(task, worktree, run_dir, telemetry, limits, condition):
     prompt_path = ROOT / task["promptFile"]
     prompt = prompt_path.read_text(encoding="utf-8")
+    env = repo_tool_env()
+    if condition == "candidate":
+        candidate_bin = worktree / "candidate" / "bin"
+        env["PATH"] = f"{candidate_bin}{os.pathsep}{env.get('PATH', '')}"
+        prompt = (
+            "Candidate mobile coordinator is available as `mobile-loop` on PATH. "
+            "Prefer `mobile-loop preflight --task {task_id}` and `mobile-loop validate --task {task_id}` "
+            "for mobile build/install/launch/observation/evidence instead of manually recreating the mobile execution loop. "
+            "`mobile-loop` uses public task metadata only; hidden evaluation remains external.\n\n"
+        ).format(task_id=task["id"]) + prompt
     events_path = run_dir / "codex-events.jsonl"
     last_message_path = run_dir / "codex-last-message.md"
     cmd = [
@@ -835,7 +845,7 @@ def execute_codex(task, worktree, run_dir, telemetry, limits):
     started = time.time()
     timeout = int(limits.get("processTimeoutSeconds", 7200))
     with events_path.open("w", encoding="utf-8") as events:
-        proc = subprocess.run(cmd, input=prompt, cwd=worktree, text=True, stdout=events, stderr=subprocess.PIPE, timeout=timeout)
+        proc = subprocess.run(cmd, input=prompt, cwd=worktree, env=env, text=True, stdout=events, stderr=subprocess.PIPE, timeout=timeout)
     telemetry.emit(
         "agent_thread_finished",
         tool="codex",
@@ -896,7 +906,7 @@ def main():
             backend, backend_url = start_backend(task, run_dir, telemetry, target, active_fault_profile)
 
         if args.execute_agent:
-            execute_codex(task, worktree, run_dir, telemetry, limits)
+            execute_codex(task, worktree, run_dir, telemetry, limits, args.condition)
 
         if target == "simulator":
             app = build_simulator(worktree, run_dir, backend_url, telemetry)

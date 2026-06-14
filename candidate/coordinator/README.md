@@ -2,6 +2,16 @@
 
 This directory is candidate-only. Baseline executor worktrees remove `candidate/` before task execution so baseline runs cannot inspect or use coordinator code.
 
+Candidate executor worktrees expose `candidate/bin` on `PATH`, so agents can call the coordinator as `mobile-loop`.
+
+Primary executor-facing commands:
+
+- `mobile-loop status`
+- `mobile-loop preflight --task <task-id>`
+- `mobile-loop validate --task <task-id>`
+
+`mobile-loop validate` uses only public task metadata and primitive local tools. It builds the app, starts a deterministic clean mock backend, installs/launches the app on the requested simulator or iPhone target, captures `agent-device` evidence, writes `runs/mobile-loop-*/mobile-loop-result.json`, and returns non-zero when public evidence checks fail. Terminal output is compact by default; pass `--verbose` to print the full command ledger. Hidden validators and private fault profiles are not exposed to the executor.
+
 The first coordinator surface is intentionally narrow:
 
 - normalize run identity across source, artifact, installed runtime, device, backend fixture, and evidence;
