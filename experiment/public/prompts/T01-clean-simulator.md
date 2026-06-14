@@ -1,3 +1,9 @@
-Fix the LoopLab SwiftUI list rendering issue for the clean simulator control task.
+You are working on the LoopLab SwiftUI app.
 
-Use the provided local tooling to build, install, launch, and inspect the app. Validate the result on the simulator against the task behavior, and preserve evidence paths in your final answer.
+Goal: produce a trustworthy simulator observation showing the clean account fixture in the app:
+
+- Account name: `Clean Account`
+- Banner: `Fresh fixture`
+- Records: `alpha` and `bravo`
+
+Use the available mobile execution tools to build, install, launch, inspect, and validate the app. Do not rely on self-reported success; preserve evidence paths in your final response.

@@ -820,6 +820,13 @@ def execute_codex(task, worktree, run_dir, telemetry, limits, condition):
     prompt_path = ROOT / task["promptFile"]
     prompt = prompt_path.read_text(encoding="utf-8")
     env = repo_tool_env()
+    prompt = (
+        "You are inside one isolated executor worktree for one experiment task. "
+        "Do not run `harness/run_task.py`, `harness/run_suite.py`, `harness/evaluate_run.py`, "
+        "or `harness/lock_experiment.py`; those are evaluator-side tools and would create nested or biased runs. "
+        "Use the mobile build, install, launch, and observation tools available inside this worktree. "
+        "Make source edits only when needed for the task, and preserve evidence paths in your final response.\n\n"
+    ) + prompt
     if condition == "candidate":
         candidate_bin = worktree / "candidate" / "bin"
         env["PATH"] = f"{candidate_bin}{os.pathsep}{env.get('PATH', '')}"

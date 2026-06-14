@@ -83,6 +83,48 @@ def latest_telemetry_event(run_dir):
     }
 
 
+def summarize_text(value, limit=500):
+    if not value:
+        return None
+    text = " ".join(str(value).split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "..."
+
+
+def latest_codex_event(run_dir):
+    if not run_dir:
+        return None
+    events_path = run_dir / "codex-events.jsonl"
+    if not events_path.exists():
+        return None
+    try:
+        lines = [line for line in events_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except OSError:
+        return None
+    for line in reversed(lines):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        item = event.get("item") or {}
+        summary = {
+            "type": event.get("type"),
+            "itemType": item.get("type"),
+            "status": item.get("status"),
+        }
+        if item.get("type") == "command_execution":
+            summary["command"] = summarize_text(item.get("command"), limit=300)
+            summary["exitCode"] = item.get("exit_code")
+            summary["outputTail"] = summarize_text(item.get("aggregated_output"), limit=500)
+        elif item.get("type") == "agent_message":
+            summary["text"] = summarize_text(item.get("text"), limit=500)
+        elif item:
+            summary["id"] = item.get("id")
+        return {key: value for key, value in summary.items() if value is not None}
+    return None
+
+
 def run_task(task_id, condition, args, timeout, suite_id=None, suite_index=None, total_runs=None):
     cmd = [
         sys.executable,
@@ -140,6 +182,7 @@ def run_task(task_id, condition, args, timeout, suite_id=None, suite_index=None,
                 "elapsedSeconds": elapsed,
                 "runDir": str(run_dir) if run_dir else None,
                 "latestTelemetry": latest_telemetry_event(run_dir),
+                "latestCodexEvent": latest_codex_event(run_dir),
             })
     duration = round(time.time() - started, 3)
     manifest_path = None

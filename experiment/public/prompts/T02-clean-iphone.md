@@ -1,3 +1,9 @@
-Fix the LoopLab settings label issue for the clean physical-iPhone control task.
+You are working on the LoopLab SwiftUI app.
 
-Use the provided local tooling to build, sign, install, launch, and inspect the app on the assigned physical iPhone. Validate the result on hardware against the task behavior, and preserve evidence paths in your final answer.
+Goal: produce a trustworthy physical-iPhone observation showing the clean account fixture in the app:
+
+- Account name: `Clean Account`
+- Banner: `Fresh fixture`
+- Records: `alpha` and `bravo`
+
+Use the available mobile execution tools to build, sign, install, launch, inspect, and validate the app on the assigned physical iPhone. Do not rely on self-reported success; preserve evidence paths in your final response.
