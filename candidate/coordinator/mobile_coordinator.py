@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
@@ -21,6 +22,12 @@ def load_jsonl(path):
 def latest(events, name):
     matches = [event for event in events if event.get("event") == name]
     return matches[-1] if matches else {}
+
+
+def write_json(path, payload):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def command_failures(metrics):
@@ -55,6 +62,43 @@ def recommended_transition(metrics):
     if health in {"evidence-missing", "untrusted-observation", "degraded"}:
         return "relaunch"
     return "rebuild"
+
+
+def preflight_manifest(args):
+    return {
+        "schemaVersion": 1,
+        "runDir": str(args.run_dir),
+        "runId": args.run_dir.name,
+        "condition": args.condition,
+        "taskId": args.task_id,
+        "preflight": {
+            "source": {
+                "head": args.source_head,
+                "present": bool(args.source_head),
+            },
+            "expected": {
+                "target": args.target,
+                "fixture": args.fixture,
+                "fault": args.fault,
+            },
+            "identityChecks": {
+                "conditionIsCandidate": args.condition == "candidate",
+                "taskIdPresent": bool(args.task_id),
+                "targetPresent": bool(args.target),
+                "fixturePresent": bool(args.fixture),
+                "sourceHeadPresent": bool(args.source_head),
+            },
+            "existingState": {
+                "artifact": None,
+                "runtime": None,
+                "evidence": None,
+            },
+            "health": "not-started",
+            "recommendedTransition": "rebuild",
+            "toolLock": json.loads(args.tool_lock_json),
+            "limits": json.loads(args.limits_json),
+        },
+    }
 
 
 def inspect_run(run_dir):
@@ -98,18 +142,67 @@ def inspect_run(run_dir):
     }
 
 
+def merge_postflight(args):
+    existing = load_json(args.output)
+    postflight = inspect_run(args.run_dir)
+    expected = existing.get("preflight", {}).get("expected", {})
+    actual_task_id = postflight.get("taskId")
+    actual_target = postflight.get("runtime", {}).get("target")
+    postflight["identityChecks"] = {
+        "taskIdMatches": actual_task_id == existing.get("taskId"),
+        "targetMatches": actual_target == expected.get("target"),
+        "sourceHeadMatches": postflight.get("source", {}).get("head") == existing.get("preflight", {}).get("source", {}).get("head"),
+    }
+    existing["postflight"] = postflight
+    return existing
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] not in {"preflight", "postflight", "inspect", "-h", "--help"}:
+        sys.argv.insert(1, "inspect")
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("run_dir", type=Path)
-    parser.add_argument("--output", type=Path)
+    subparsers = parser.add_subparsers(dest="command")
+
+    preflight = subparsers.add_parser("preflight")
+    preflight.add_argument("run_dir", type=Path)
+    preflight.add_argument("--output", type=Path, required=True)
+    preflight.add_argument("--condition", required=True)
+    preflight.add_argument("--task-id", required=True)
+    preflight.add_argument("--target", required=True)
+    preflight.add_argument("--fixture", required=True)
+    preflight.add_argument("--fault", required=True)
+    preflight.add_argument("--source-head", required=True)
+    preflight.add_argument("--tool-lock-json", required=True)
+    preflight.add_argument("--limits-json", required=True)
+
+    postflight = subparsers.add_parser("postflight")
+    postflight.add_argument("run_dir", type=Path)
+    postflight.add_argument("--output", type=Path, required=True)
+
+    inspect = subparsers.add_parser("inspect")
+    inspect.add_argument("run_dir", type=Path)
+    inspect.add_argument("--output", type=Path)
     args = parser.parse_args()
 
-    payload = inspect_run(args.run_dir)
-    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(text, encoding="utf-8")
+    if args.command == "preflight":
+        payload = preflight_manifest(args)
+        write_json(args.output, payload)
         print(args.output)
+        return
+    if args.command == "postflight":
+        payload = merge_postflight(args)
+        write_json(args.output, payload)
+        print(args.output)
+        return
+
+    run_dir = args.run_dir
+    output = args.output
+    payload = inspect_run(run_dir)
+    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    if output:
+        write_json(output, payload)
+        print(output)
     else:
         print(text, end="")
 

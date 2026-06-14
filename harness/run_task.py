@@ -24,6 +24,7 @@ TOOL_LOCK = ROOT / "experiment" / "public" / "tool-versions.lock.json"
 LIMITS = ROOT / "experiment" / "public" / "limits.json"
 FAULTS = ROOT / "experiment" / "private" / "faults" / "fault_profiles.json"
 AGENT_DEVICE = ROOT / "node_modules" / ".bin" / "agent-device"
+COORDINATOR = ROOT / "candidate" / "coordinator" / "mobile_coordinator.py"
 LOCAL_NODE_BIN = ROOT / "node_modules" / "node" / "bin"
 
 
@@ -131,6 +132,68 @@ def create_worktree(run_dir, telemetry, condition):
         worktree_node_modules.symlink_to(root_node_modules, target_is_directory=True)
         telemetry.emit("shared_tooling_linked", source=str(root_node_modules), path=str(worktree_node_modules))
     return worktree
+
+
+def coordinator_manifest_path(run_dir):
+    return run_dir / "coordinator_manifest.json"
+
+
+def coordinator_preflight(run_dir, telemetry, task, condition, target, source_head, tool_lock, limits):
+    if condition != "candidate":
+        return None
+    output = coordinator_manifest_path(run_dir)
+    run(
+        [
+            sys.executable,
+            str(COORDINATOR),
+            "preflight",
+            str(run_dir),
+            "--output",
+            str(output),
+            "--condition",
+            condition,
+            "--task-id",
+            task["id"],
+            "--target",
+            target,
+            "--fixture",
+            task["fixture"],
+            "--fault",
+            task.get("fault", "none"),
+            "--source-head",
+            source_head,
+            "--tool-lock-json",
+            json.dumps(tool_lock, sort_keys=True),
+            "--limits-json",
+            json.dumps(limits, sort_keys=True),
+        ],
+        telemetry,
+        timeout=60,
+    )
+    telemetry.emit("coordinator_preflight_written", path=str(output))
+    return output
+
+
+def coordinator_postflight(run_dir, telemetry, condition, check=True):
+    if condition != "candidate":
+        return None
+    output = coordinator_manifest_path(run_dir)
+    proc = run(
+        [
+            sys.executable,
+            str(COORDINATOR),
+            "postflight",
+            str(run_dir),
+            "--output",
+            str(output),
+        ],
+        telemetry,
+        check=check,
+        timeout=60,
+    )
+    if proc.returncode == 0:
+        telemetry.emit("coordinator_postflight_written", path=str(output))
+    return output
 
 
 def start_backend(task, run_dir, telemetry, target, fault_profile):
@@ -510,6 +573,7 @@ def main():
     source_head = git_head(ROOT)
     telemetry.emit("run_started", runId=run_id, task=args.task, condition=args.condition, target=target, sourceHead=source_head, toolLock=tool_lock, limits=limits)
     telemetry.emit("fault_profile_loaded", fault=task.get("fault", "none"), profileId=fault_profile["id"])
+    coordinator_preflight(run_dir, telemetry, task, args.condition, target, source_head, tool_lock, limits)
 
     backend = None
     try:
@@ -538,6 +602,7 @@ def main():
         telemetry.emit("run_finished", manifest=str(manifest))
         _, metrics_path = write_metrics(run_dir)
         telemetry.emit("metrics_written", path=str(metrics_path))
+        coordinator_postflight(run_dir, telemetry, args.condition)
         print(manifest)
     except Exception as error:
         telemetry.emit("run_failed", errorType=type(error).__name__, error=str(error))
@@ -554,6 +619,7 @@ def main():
         })
         _, metrics_path = write_metrics(run_dir)
         telemetry.emit("metrics_written", path=str(metrics_path))
+        coordinator_postflight(run_dir, telemetry, args.condition, check=False)
         print(manifest)
         raise
     finally:
