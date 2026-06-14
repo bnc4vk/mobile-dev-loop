@@ -55,6 +55,36 @@
       "target": "simulator",
       "fault": "runtime-kill-after-open",
       "promptFile": "experiment/public/prompts/T07-runtime-kill-simulator.md"
+    },
+    {
+      "id": "T08-camera-surface-iphone",
+      "title": "Physical iPhone camera-surface control",
+      "fixture": "clean",
+      "target": "iphone",
+      "fault": "none",
+      "promptFile": "experiment/public/prompts/T08-camera-surface-iphone.md",
+      "evidenceScreens": [
+        {
+          "name": "camera",
+          "pressLabel": "Camera"
+        }
+      ]
+    },
+    {
+      "id": "T09-broken-runner-iphone",
+      "title": "Broken automation runner physical-iPhone fault",
+      "fixture": "clean",
+      "target": "iphone",
+      "fault": "broken-automation-runner",
+      "promptFile": "experiment/public/prompts/T09-broken-runner-iphone.md"
+    },
+    {
+      "id": "T10-failed-install-iphone",
+      "title": "Failed install physical-iPhone fault",
+      "fixture": "clean",
+      "target": "iphone",
+      "fault": "failed-install",
+      "promptFile": "experiment/public/prompts/T10-failed-install-iphone.md"
     }
   ]
 }

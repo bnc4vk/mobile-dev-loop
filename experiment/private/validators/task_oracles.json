@@ -111,6 +111,63 @@
         "Unknown",
         "Not loaded"
       ]
+    },
+    "T08-camera-surface-iphone": {
+      "oracle": "scripted-camera-surface-v1",
+      "expectedTarget": "iphone",
+      "expectedFixture": "clean",
+      "snapshotFile": "agent-device-camera-snapshot.txt",
+      "requiredSnapshotText": [
+        "Camera",
+        "Camera surface ready",
+        "Permission:"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded"
+      ],
+      "forbiddenBackendUrlText": [
+        "127.0.0.1",
+        "localhost"
+      ]
+    },
+    "T09-broken-runner-iphone": {
+      "oracle": "scripted-clean-control-v1",
+      "expectedTarget": "iphone",
+      "expectedFixture": "clean",
+      "requiredSnapshotText": [
+        "Clean Account",
+        "Fresh fixture",
+        "alpha",
+        "bravo"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded"
+      ],
+      "forbiddenBackendUrlText": [
+        "127.0.0.1",
+        "localhost"
+      ]
+    },
+    "T10-failed-install-iphone": {
+      "oracle": "scripted-clean-control-v1",
+      "expectedTarget": "iphone",
+      "expectedFixture": "clean",
+      "requiredSnapshotText": [
+        "Clean Account",
+        "Fresh fixture",
+        "alpha",
+        "bravo"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded"
+      ],
+      "forbiddenBackendUrlText": [
+        "127.0.0.1",
+        "localhost"
+      ]
     }
   }
 }

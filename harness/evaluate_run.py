@@ -38,6 +38,15 @@ def optional_path(value):
     return Path(value) if value else None
 
 
+def oracle_snapshot_path(run_dir, oracle, metrics):
+    snapshot_file = oracle.get("snapshotFile")
+    if snapshot_file:
+        return run_dir / "evidence" / snapshot_file
+    evidence = metrics.get("evidence", {})
+    paths = evidence.get("paths", {})
+    return optional_path(paths.get("snapshot"))
+
+
 def evaluate(run_dir):
     run_dir = Path(run_dir)
     manifest = load_json(run_dir / "manifest.json")
@@ -70,7 +79,7 @@ def evaluate(run_dir):
     evidence = metrics.get("evidence", {})
     paths = evidence.get("paths", {})
     screenshot_path = optional_path(paths.get("screenshot"))
-    snapshot_path = optional_path(paths.get("snapshot"))
+    snapshot_path = oracle_snapshot_path(run_dir, oracle, metrics)
     screenshot_exists = bool(screenshot_path and screenshot_path.is_file())
     snapshot_exists = bool(snapshot_path and snapshot_path.is_file())
     check(screenshot_exists, observations, "screenshot evidence exists", {"path": str(screenshot_path) if screenshot_path else None})

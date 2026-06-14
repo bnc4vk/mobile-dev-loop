@@ -354,7 +354,39 @@ def agent_device_env(target, run_dir, development_team=None):
     return env
 
 
-def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, development_team=None, fault_profile=None):
+def capture_extra_agent_device_evidence(common, env, run_dir, telemetry, task):
+    extra = []
+    for screen in task.get("evidenceScreens", []):
+        name = screen["name"]
+        press_label = screen.get("pressLabel")
+        if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+            raise RuntimeError(f"invalid evidence screen name: {name}")
+
+        if press_label:
+            press_proc = run(common + ["press", f'label="{press_label}"'], telemetry, env=env, check=False, timeout=120)
+        else:
+            press_proc = None
+        time.sleep(0.5)
+
+        screenshot = run_dir / "evidence" / f"agent-device-{name}-screenshot.png"
+        snapshot = run_dir / "evidence" / f"agent-device-{name}-snapshot.txt"
+        screenshot_proc = run(common + ["screenshot", str(screenshot), "--json"], telemetry, env=env, check=False, timeout=120)
+        snapshot_proc = run(common + ["snapshot"], telemetry, env=env, check=False, timeout=120)
+        if snapshot_proc.stdout:
+            snapshot.write_text(snapshot_proc.stdout, encoding="utf-8")
+        extra.append({
+            "name": name,
+            "pressLabel": press_label,
+            "pressExitCode": press_proc.returncode if press_proc else None,
+            "screenshot": str(screenshot) if screenshot.exists() else None,
+            "snapshot": str(snapshot) if snapshot.exists() else None,
+            "screenshotExitCode": screenshot_proc.returncode,
+            "snapshotExitCode": snapshot_proc.returncode,
+        })
+    return extra
+
+
+def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, development_team=None, fault_profile=None):
     fault_profile = fault_profile or {"id": "none"}
     evidence_dir = run_dir / "evidence"
     state_dir = run_dir / "agent-device-state"
@@ -378,9 +410,10 @@ def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend
     time.sleep(0.5)
     screenshot_proc = run(common + ["screenshot", str(screenshot), "--json"], telemetry, env=env, check=False, timeout=120)
     snapshot_proc = run(common + ["snapshot"], telemetry, env=env, check=False, timeout=120)
-    close_proc = run(common + ["close"], telemetry, env=env, check=False, timeout=60)
     if snapshot_proc.stdout:
         snapshot.write_text(snapshot_proc.stdout, encoding="utf-8")
+    extra_evidence = capture_extra_agent_device_evidence(common, env, run_dir, telemetry, task)
+    close_proc = run(common + ["close"], telemetry, env=env, check=False, timeout=60)
 
     telemetry.emit(
         "agent_device_evidence_captured",
@@ -393,6 +426,7 @@ def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend
         screenshotExitCode=screenshot_proc.returncode,
         snapshotExitCode=snapshot_proc.returncode,
         closeExitCode=close_proc.returncode,
+        extraEvidence=extra_evidence,
     )
 
 
@@ -472,11 +506,11 @@ def main():
         if target == "simulator":
             app = build_simulator(worktree, run_dir, backend_url, telemetry)
             device_id, _ = install_launch_simulator(app, backend_url, telemetry, run_dir, fault_profile)
-            capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, fault_profile=fault_profile)
+            capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, fault_profile=fault_profile)
         else:
             app = build_iphone(worktree, run_dir, backend_url, telemetry, args.device_id, args.development_team)
             device_id = install_launch_iphone(app, backend_url, telemetry, args.device_id, run_dir, fault_profile)
-            capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, args.development_team, fault_profile)
+            capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, args.development_team, fault_profile)
 
         manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": source_head, "status": "completed", "toolLock": tool_lock})
         telemetry.emit("run_finished", manifest=str(manifest))

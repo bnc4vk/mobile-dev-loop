@@ -114,10 +114,19 @@ def summarize_run(run_dir):
         "screenshot": evidence.get("screenshot"),
         "snapshot": evidence.get("snapshot"),
     }
+    extra_evidence = evidence.get("extraEvidence", [])
     evidence_exists = {
         key: bool(value and Path(value).exists())
         for key, value in evidence_paths.items()
     }
+    extra_evidence_exists = [
+        {
+            **item,
+            "screenshotExists": bool(item.get("screenshot") and Path(item["screenshot"]).exists()),
+            "snapshotExists": bool(item.get("snapshot") and Path(item["snapshot"]).exists()),
+        }
+        for item in extra_evidence
+    ]
 
     trustworthy_artifact_validation = bool(
         artifact.get("sha256")
@@ -186,6 +195,7 @@ def summarize_run(run_dir):
         "evidence": {
             "paths": evidence_paths,
             "exists": evidence_exists,
+            "extra": extra_evidence_exists,
             "agentDeviceStateDir": evidence.get("stateDir"),
         },
     }
