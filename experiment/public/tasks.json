@@ -43,6 +43,7 @@
       "target": "simulator",
       "fault": "broken-automation-runner",
       "expectedOutcome": "validation-failure",
+      "candidateExpectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T05-broken-runner-simulator.md"
     },
     {
@@ -85,6 +86,7 @@
       "target": "iphone",
       "fault": "broken-automation-runner",
       "expectedOutcome": "validation-failure",
+      "candidateExpectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T09-broken-runner-iphone.md"
     },
     {

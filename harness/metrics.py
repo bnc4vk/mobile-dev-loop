@@ -195,6 +195,7 @@ def summarize_run(run_dir):
     artifact = by_event.get("artifact_built", [{}])[-1] if by_event.get("artifact_built") else {}
     launch = by_event.get("app_launched", [{}])[-1] if by_event.get("app_launched") else {}
     evidence = by_event.get("agent_device_evidence_captured", [{}])[-1] if by_event.get("agent_device_evidence_captured") else {}
+    recoveries = by_event.get("coordinator_recovery_finished", [])
 
     evidence_paths = {
         "screenshot": evidence.get("screenshot"),
@@ -222,6 +223,9 @@ def summarize_run(run_dir):
         and evidence.get("snapshotExitCode") == 0
         and all(evidence_exists.values())
     )
+    automatic_recovery_success = None
+    if recoveries:
+        automatic_recovery_success = any(event.get("success") is True for event in recoveries)
 
     install_count = command_metrics.get("install", {}).get("count", 0)
     build_count = command_metrics.get("build", {}).get("count", 0)
@@ -254,7 +258,7 @@ def summarize_run(run_dir):
         "primary": {
             "trustworthyArtifactValidation": trustworthy_artifact_validation,
             "stateRestorationSuccess": None,
-            "automaticEnvironmentRecoverySuccess": None,
+            "automaticEnvironmentRecoverySuccess": automatic_recovery_success,
             "wastedAgentIterationsCausedByInfrastructure": None,
             "editToTrustworthyObservationSeconds": total_seconds if trustworthy_artifact_validation else None,
             "unnecessaryBuildsReinstallsResets": None,

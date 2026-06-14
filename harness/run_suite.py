@@ -114,7 +114,13 @@ def actual_outcome(exit_code, validation_passed):
     return "completed-unvalidated"
 
 
-def task_expected_outcome(task, suite):
+def task_expected_outcome(task, suite, condition):
+    condition_overrides = suite.get("expectedOutcomesByCondition", {}).get(condition, {})
+    if task["id"] in condition_overrides:
+        return condition_overrides[task["id"]]
+    condition_key = f"{condition}ExpectedOutcome"
+    if condition_key in task:
+        return task[condition_key]
     overrides = suite.get("expectedOutcomes", {})
     if task["id"] in overrides:
         return overrides[task["id"]]
@@ -131,7 +137,7 @@ def summarize_suite(suite_id, suite_dir, suite, known_tasks, run_results):
         validation = load_json(Path(item["runDir"]) / "validation.json") if item.get("runDir") else {}
         flat_metrics = flatten(metrics) if metrics else {}
         task = known_tasks[item["taskId"]]
-        expected = task_expected_outcome(task, suite)
+        expected = task_expected_outcome(task, suite, item["condition"])
         validation_passed = validation.get("passed")
         actual = actual_outcome(item.get("exitCode"), validation_passed)
         outcome_matched = actual == expected
@@ -220,7 +226,7 @@ def main():
         validation = None
         if proc.returncode == 0 and run_dir and not args.no_evaluate:
             validation = evaluate(run_dir)
-        expected = task_expected_outcome(known_tasks[run_spec["taskId"]], suite)
+        expected = task_expected_outcome(known_tasks[run_spec["taskId"]], suite, run_spec["condition"])
         validation_passed = validation.get("passed") if validation else None
         actual = actual_outcome(proc.returncode, validation_passed)
         outcome_matched = actual == expected

@@ -219,6 +219,37 @@ def coordinator_observation_decision(run_dir, telemetry, condition):
     return action
 
 
+def coordinator_recover_runner(run_dir, telemetry, condition, device_id):
+    if condition != "candidate":
+        return None
+    output = coordinator_manifest_path(run_dir)
+    run(
+        [
+            sys.executable,
+            str(COORDINATOR),
+            "recover-runner",
+            str(run_dir),
+            "--output",
+            str(output),
+            "--device-id",
+            device_id,
+        ],
+        telemetry,
+        timeout=60,
+    )
+    manifest = json.loads(output.read_text(encoding="utf-8"))
+    recovery = manifest.get("activeRecovery", {})
+    telemetry.emit(
+        "coordinator_recovery_applied",
+        path=str(output),
+        action=recovery.get("action"),
+        deviceId=device_id,
+        leasePath=recovery.get("leasePath"),
+        leaseRemoved=recovery.get("leaseRemoved"),
+    )
+    return recovery
+
+
 def start_backend(task, run_dir, telemetry, target, fault_profile):
     port = free_port()
     bind_host = "0.0.0.0" if target == "iphone" else "127.0.0.1"
@@ -489,7 +520,7 @@ def capture_extra_agent_device_evidence(common, env, run_dir, telemetry, task):
     return extra
 
 
-def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, development_team=None, fault_profile=None, observation_transition="baseline"):
+def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, development_team=None, fault_profile=None, observation_transition="baseline", recovery_attempt=0):
     fault_profile = fault_profile or {"id": "none"}
     evidence_dir = run_dir / "evidence"
     state_dir = run_dir / "agent-device-state"
@@ -518,20 +549,88 @@ def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend
     extra_evidence = capture_extra_agent_device_evidence(common, env, run_dir, telemetry, task)
     close_proc = run(common + ["close"], telemetry, env=env, check=False, timeout=60)
 
-    telemetry.emit(
-        "agent_device_evidence_captured",
-        target=target,
-        deviceId=device_id,
-        stateDir=str(state_dir),
-        screenshot=str(screenshot) if screenshot.exists() else None,
-        snapshot=str(snapshot) if snapshot.exists() else None,
-        openExitCode=open_proc.returncode,
-        observationTransition=observation_transition,
-        screenshotExitCode=screenshot_proc.returncode,
-        snapshotExitCode=snapshot_proc.returncode,
-        closeExitCode=close_proc.returncode,
-        extraEvidence=extra_evidence,
+    event = {
+        "target": target,
+        "deviceId": device_id,
+        "stateDir": str(state_dir),
+        "screenshot": str(screenshot) if screenshot.exists() else None,
+        "snapshot": str(snapshot) if snapshot.exists() else None,
+        "openExitCode": open_proc.returncode,
+        "observationTransition": observation_transition,
+        "screenshotExitCode": screenshot_proc.returncode,
+        "snapshotExitCode": snapshot_proc.returncode,
+        "closeExitCode": close_proc.returncode,
+        "extraEvidence": extra_evidence,
+        "recoveryAttempt": recovery_attempt,
+    }
+    telemetry.emit("agent_device_evidence_captured", **event)
+    return event
+
+
+def evidence_capture_trustworthy(evidence):
+    return bool(
+        evidence
+        and evidence.get("openExitCode") == 0
+        and evidence.get("screenshotExitCode") == 0
+        and evidence.get("snapshotExitCode") == 0
+        and evidence.get("screenshot")
+        and Path(evidence["screenshot"]).exists()
+        and evidence.get("snapshot")
+        and Path(evidence["snapshot"]).exists()
     )
+
+
+def should_recover_runner(condition, fault_profile, evidence):
+    return bool(
+        condition == "candidate"
+        and fault_profile.get("busyAgentDeviceRunnerBeforeEvidence")
+        and not evidence_capture_trustworthy(evidence)
+    )
+
+
+def fault_profile_without_runner_injection(fault_profile):
+    recovered = dict(fault_profile)
+    recovered.pop("busyAgentDeviceRunnerBeforeEvidence", None)
+    recovered["recoveredFromFault"] = fault_profile.get("id")
+    return recovered
+
+
+def capture_evidence_with_candidate_recovery(run_dir, telemetry, condition, device_id, target, backend_url, task, development_team=None, fault_profile=None, observation_transition="baseline"):
+    evidence = capture_agent_device_evidence(
+        run_dir,
+        telemetry,
+        device_id,
+        target,
+        backend_url,
+        task,
+        development_team=development_team,
+        fault_profile=fault_profile,
+        observation_transition=observation_transition,
+    )
+    if not should_recover_runner(condition, fault_profile or {}, evidence):
+        return evidence
+
+    coordinator_recover_runner(run_dir, telemetry, condition, device_id)
+    retry_profile = fault_profile_without_runner_injection(fault_profile or {})
+    retry = capture_agent_device_evidence(
+        run_dir,
+        telemetry,
+        device_id,
+        target,
+        backend_url,
+        task,
+        development_team=development_team,
+        fault_profile=retry_profile,
+        observation_transition="relaunch-after-runner-recovery",
+        recovery_attempt=1,
+    )
+    telemetry.emit(
+        "coordinator_recovery_finished",
+        action="recover-runner",
+        deviceId=device_id,
+        success=evidence_capture_trustworthy(retry),
+    )
+    return retry
 
 
 def write_manifest(run_dir, manifest):
@@ -620,7 +719,17 @@ def main():
             if observation_transition == "reuse-observation":
                 telemetry.emit("agent_device_evidence_reused", target=target, deviceId=device_id)
             else:
-                capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, fault_profile=fault_profile, observation_transition=observation_transition)
+                capture_evidence_with_candidate_recovery(
+                    run_dir,
+                    telemetry,
+                    args.condition,
+                    device_id,
+                    target,
+                    backend_url,
+                    task,
+                    fault_profile=fault_profile,
+                    observation_transition=observation_transition,
+                )
         else:
             app = build_iphone(worktree, run_dir, backend_url, telemetry, args.device_id, args.development_team)
             device_id = install_launch_iphone(app, backend_url, telemetry, args.device_id, run_dir, fault_profile)
@@ -628,7 +737,18 @@ def main():
             if observation_transition == "reuse-observation":
                 telemetry.emit("agent_device_evidence_reused", target=target, deviceId=device_id)
             else:
-                capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, args.development_team, fault_profile, observation_transition)
+                capture_evidence_with_candidate_recovery(
+                    run_dir,
+                    telemetry,
+                    args.condition,
+                    device_id,
+                    target,
+                    backend_url,
+                    task,
+                    development_team=args.development_team,
+                    fault_profile=fault_profile,
+                    observation_transition=observation_transition,
+                )
 
         manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": source_head, "status": "completed", "toolLock": tool_lock, "limits": limits})
         telemetry.emit("run_finished", manifest=str(manifest))

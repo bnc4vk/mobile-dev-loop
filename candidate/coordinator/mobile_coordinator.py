@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -43,6 +44,8 @@ def runtime_health(metrics):
         return "evidence-missing"
     if metrics.get("primary", {}).get("trustworthyArtifactValidation") is not True:
         return "untrusted-observation"
+    if metrics.get("primary", {}).get("automaticEnvironmentRecoverySuccess") is True:
+        return "recovered"
     if failures:
         return "degraded"
     return "healthy"
@@ -51,7 +54,7 @@ def runtime_health(metrics):
 def recommended_transition(metrics):
     health = runtime_health(metrics)
     failed_labels = {item.get("label") for item in command_failures(metrics)}
-    if health == "healthy":
+    if health in {"healthy", "recovered"}:
         return "reuse-observation"
     if "install" in failed_labels:
         return "rebuild"
@@ -159,7 +162,7 @@ def merge_postflight(args):
 
 def evidence_is_trustworthy(run_dir):
     metrics = load_json(run_dir / "metrics.json")
-    if metrics and runtime_health(metrics) == "healthy":
+    if metrics and runtime_health(metrics) in {"healthy", "recovered"}:
         return True
 
     events = load_jsonl(run_dir / "telemetry.jsonl")
@@ -198,8 +201,32 @@ def decide_observation(args):
     return manifest
 
 
+def runner_lease_path(run_dir, device_id):
+    safe_id = re.sub(r"[^A-Za-z0-9._-]", "-", device_id) or "unknown-device"
+    return Path(run_dir) / "agent-device-runner-leases" / f"{safe_id}.json"
+
+
+def recover_runner(args):
+    manifest = load_json(args.output)
+    lease_path = runner_lease_path(args.run_dir, args.device_id)
+    existed = lease_path.exists()
+    if existed:
+        lease_path.unlink()
+    recovery = {
+        "phase": "before-observation-retry",
+        "action": "recover-runner",
+        "deviceId": args.device_id,
+        "leasePath": str(lease_path),
+        "leaseExisted": existed,
+        "leaseRemoved": existed and not lease_path.exists(),
+    }
+    manifest.setdefault("recoveries", []).append(recovery)
+    manifest["activeRecovery"] = recovery
+    return manifest
+
+
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] not in {"preflight", "decide-observation", "postflight", "inspect", "-h", "--help"}:
+    if len(sys.argv) > 1 and sys.argv[1] not in {"preflight", "decide-observation", "recover-runner", "postflight", "inspect", "-h", "--help"}:
         sys.argv.insert(1, "inspect")
 
     parser = argparse.ArgumentParser()
@@ -225,6 +252,11 @@ def main():
     decide.add_argument("run_dir", type=Path)
     decide.add_argument("--output", type=Path, required=True)
 
+    recover = subparsers.add_parser("recover-runner")
+    recover.add_argument("run_dir", type=Path)
+    recover.add_argument("--output", type=Path, required=True)
+    recover.add_argument("--device-id", required=True)
+
     inspect = subparsers.add_parser("inspect")
     inspect.add_argument("run_dir", type=Path)
     inspect.add_argument("--output", type=Path)
@@ -242,6 +274,11 @@ def main():
         return
     if args.command == "decide-observation":
         payload = decide_observation(args)
+        write_json(args.output, payload)
+        print(args.output)
+        return
+    if args.command == "recover-runner":
+        payload = recover_runner(args)
         write_json(args.output, payload)
         print(args.output)
         return
