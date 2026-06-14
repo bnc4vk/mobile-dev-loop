@@ -25,6 +25,7 @@
       "target": "simulator",
       "fault": "stale-fixture",
       "expectedOutcome": "validation-failure",
+      "candidateExpectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T03-stale-fixture-simulator.md"
     },
     {
@@ -34,6 +35,7 @@
       "target": "simulator",
       "fault": "backend-http-500",
       "expectedOutcome": "validation-failure",
+      "candidateExpectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T04-backend-500-simulator.md"
     },
     {
@@ -53,6 +55,7 @@
       "target": "simulator",
       "fault": "failed-install",
       "expectedOutcome": "process-failure",
+      "candidateExpectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T06-failed-install-simulator.md"
     },
     {
@@ -62,6 +65,7 @@
       "target": "simulator",
       "fault": "runtime-kill-after-open",
       "expectedOutcome": "validation-failure",
+      "candidateExpectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T07-runtime-kill-simulator.md"
     },
     {
@@ -96,6 +100,7 @@
       "target": "iphone",
       "fault": "failed-install",
       "expectedOutcome": "process-failure",
+      "candidateExpectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T10-failed-install-iphone.md"
     }
   ]

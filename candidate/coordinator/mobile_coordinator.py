@@ -225,8 +225,51 @@ def recover_runner(args):
     return manifest
 
 
+def recover_install(args):
+    manifest = load_json(args.output)
+    recovery = {
+        "phase": "after-install-failure",
+        "action": "recover-install",
+        "target": args.target,
+        "recommendedTransition": "rebuild",
+        "errorTail": args.error[-500:],
+    }
+    manifest.setdefault("recoveries", []).append(recovery)
+    manifest["activeRecovery"] = recovery
+    return manifest
+
+
+def recover_runtime(args):
+    manifest = load_json(args.output)
+    recovery = {
+        "phase": "before-observation-retry",
+        "action": "recover-runtime",
+        "target": args.target,
+        "deviceId": args.device_id,
+        "recommendedTransition": "relaunch",
+    }
+    manifest.setdefault("recoveries", []).append(recovery)
+    manifest["activeRecovery"] = recovery
+    return manifest
+
+
+def recover_backend(args):
+    manifest = load_json(args.output)
+    recovery = {
+        "phase": "after-backend-start",
+        "action": "recover-backend",
+        "expectedFixture": args.expected_fixture,
+        "actualFixture": args.actual_fixture,
+        "actualFailure": args.actual_failure,
+        "recommendedTransition": "restore-fixture",
+    }
+    manifest.setdefault("recoveries", []).append(recovery)
+    manifest["activeRecovery"] = recovery
+    return manifest
+
+
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] not in {"preflight", "decide-observation", "recover-runner", "postflight", "inspect", "-h", "--help"}:
+    if len(sys.argv) > 1 and sys.argv[1] not in {"preflight", "decide-observation", "recover-runner", "recover-install", "recover-runtime", "recover-backend", "postflight", "inspect", "-h", "--help"}:
         sys.argv.insert(1, "inspect")
 
     parser = argparse.ArgumentParser()
@@ -257,6 +300,25 @@ def main():
     recover.add_argument("--output", type=Path, required=True)
     recover.add_argument("--device-id", required=True)
 
+    recover_install_parser = subparsers.add_parser("recover-install")
+    recover_install_parser.add_argument("run_dir", type=Path)
+    recover_install_parser.add_argument("--output", type=Path, required=True)
+    recover_install_parser.add_argument("--target", required=True)
+    recover_install_parser.add_argument("--error", required=True)
+
+    recover_runtime_parser = subparsers.add_parser("recover-runtime")
+    recover_runtime_parser.add_argument("run_dir", type=Path)
+    recover_runtime_parser.add_argument("--output", type=Path, required=True)
+    recover_runtime_parser.add_argument("--target", required=True)
+    recover_runtime_parser.add_argument("--device-id", required=True)
+
+    recover_backend_parser = subparsers.add_parser("recover-backend")
+    recover_backend_parser.add_argument("run_dir", type=Path)
+    recover_backend_parser.add_argument("--output", type=Path, required=True)
+    recover_backend_parser.add_argument("--expected-fixture", required=True)
+    recover_backend_parser.add_argument("--actual-fixture", required=True)
+    recover_backend_parser.add_argument("--actual-failure", required=True)
+
     inspect = subparsers.add_parser("inspect")
     inspect.add_argument("run_dir", type=Path)
     inspect.add_argument("--output", type=Path)
@@ -279,6 +341,21 @@ def main():
         return
     if args.command == "recover-runner":
         payload = recover_runner(args)
+        write_json(args.output, payload)
+        print(args.output)
+        return
+    if args.command == "recover-install":
+        payload = recover_install(args)
+        write_json(args.output, payload)
+        print(args.output)
+        return
+    if args.command == "recover-runtime":
+        payload = recover_runtime(args)
+        write_json(args.output, payload)
+        print(args.output)
+        return
+    if args.command == "recover-backend":
+        payload = recover_backend(args)
         write_json(args.output, payload)
         print(args.output)
         return

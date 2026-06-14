@@ -226,6 +226,10 @@ def summarize_run(run_dir):
     automatic_recovery_success = None
     if recoveries:
         automatic_recovery_success = any(event.get("success") is True for event in recoveries)
+    backend_recoveries = [event for event in recoveries if event.get("action") == "recover-backend"]
+    state_restoration_success = None
+    if backend_recoveries:
+        state_restoration_success = any(event.get("success") is True for event in backend_recoveries)
 
     install_count = command_metrics.get("install", {}).get("count", 0)
     build_count = command_metrics.get("build", {}).get("count", 0)
@@ -257,7 +261,7 @@ def summarize_run(run_dir):
         },
         "primary": {
             "trustworthyArtifactValidation": trustworthy_artifact_validation,
-            "stateRestorationSuccess": None,
+            "stateRestorationSuccess": state_restoration_success,
             "automaticEnvironmentRecoverySuccess": automatic_recovery_success,
             "wastedAgentIterationsCausedByInfrastructure": None,
             "editToTrustworthyObservationSeconds": total_seconds if trustworthy_artifact_validation else None,
