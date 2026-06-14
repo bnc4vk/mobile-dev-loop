@@ -127,11 +127,39 @@ def task_expected_outcome(task, suite, condition):
     return task.get("expectedOutcome", "oracle-pass")
 
 
+def limit_violations(metrics, limits):
+    secondary = metrics.get("secondary", {}) if metrics else {}
+    violations = []
+    checks = [
+        ("maxTurns", "turnCount"),
+        ("maxToolCalls", "toolCallCount"),
+    ]
+    for limit_key, metric_key in checks:
+        limit = limits.get(limit_key)
+        value = secondary.get(metric_key)
+        if limit is not None and value is not None and value > limit:
+            violations.append({
+                "limit": limit_key,
+                "metric": metric_key,
+                "value": value,
+                "maximum": limit,
+            })
+    if secondary.get("processLimitHit"):
+        violations.append({
+            "limit": "processTimeoutSeconds",
+            "metric": "processLimitHit",
+            "value": True,
+            "maximum": limits.get("processTimeoutSeconds"),
+        })
+    return violations
+
+
 def summarize_suite(suite_id, suite_dir, suite, known_tasks, run_results):
     rows = []
     passed = 0
     completed = 0
     expected_matched = 0
+    limits_respected = 0
     for item in run_results:
         metrics = load_json(Path(item["runDir"]) / "metrics.json") if item.get("runDir") else {}
         validation = load_json(Path(item["runDir"]) / "validation.json") if item.get("runDir") else {}
@@ -141,18 +169,23 @@ def summarize_suite(suite_id, suite_dir, suite, known_tasks, run_results):
         validation_passed = validation.get("passed")
         actual = actual_outcome(item.get("exitCode"), validation_passed)
         outcome_matched = actual == expected
+        violations = item.get("limitViolations")
+        if violations is None:
+            violations = limit_violations(metrics, item.get("limits", {}))
         row = {
             **item,
             **flat_metrics,
             "expectedOutcome": expected,
             "actualOutcome": actual,
             "outcomeMatched": outcome_matched,
+            "limitViolations": violations,
             "validationPassed": validation_passed,
         }
         rows.append(row)
         completed += int(item.get("exitCode") == 0)
         passed += int(validation_passed is True)
         expected_matched += int(outcome_matched)
+        limits_respected += int(not violations)
 
     payload = {
         "suiteId": suite_id,
@@ -161,9 +194,11 @@ def summarize_suite(suite_id, suite_dir, suite, known_tasks, run_results):
         "completedRuns": completed,
         "validatedRuns": passed,
         "expectedOutcomeMatchedRuns": expected_matched,
+        "limitRespectedRuns": limits_respected,
         "allCompleted": completed == len(run_results),
         "allValidated": passed == len(run_results),
         "allExpectedOutcomesMatched": expected_matched == len(run_results),
+        "allLimitsRespected": limits_respected == len(run_results),
         "runs": rows,
     }
     write_json(suite_dir / "suite-summary.json", payload)
@@ -226,6 +261,8 @@ def main():
         validation = None
         if proc.returncode == 0 and run_dir and not args.no_evaluate:
             validation = evaluate(run_dir)
+        metrics = load_json(run_dir / "metrics.json") if run_dir else {}
+        violations = limit_violations(metrics, limits)
         expected = task_expected_outcome(known_tasks[run_spec["taskId"]], suite, run_spec["condition"])
         validation_passed = validation.get("passed") if validation else None
         actual = actual_outcome(proc.returncode, validation_passed)
@@ -244,18 +281,20 @@ def main():
             "expectedOutcome": expected,
             "actualOutcome": actual,
             "outcomeMatched": outcome_matched,
+            "limitViolations": violations,
+            "limits": limits,
             "validationPassed": validation_passed,
         }
         append_jsonl(suite_dir / "suite-runs.jsonl", result)
         results.append(result)
         print(json.dumps(result, sort_keys=True))
 
-        if not outcome_matched and not args.keep_going:
+        if (not outcome_matched or violations) and not args.keep_going:
             break
 
     summary = summarize_suite(suite_id, suite_dir, suite, known_tasks, results)
     print(suite_dir / "suite-summary.json")
-    if not summary["allExpectedOutcomesMatched"]:
+    if not summary["allExpectedOutcomesMatched"] or not summary["allLimitsRespected"]:
         sys.exit(1)
 
 
