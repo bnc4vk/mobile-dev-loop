@@ -21,6 +21,7 @@ APP_PROJECT = ROOT / "apps" / "LoopLab" / "LoopLab.xcodeproj"
 RUNS = ROOT / "runs"
 TASKS = ROOT / "experiment" / "public" / "tasks.json"
 TOOL_LOCK = ROOT / "experiment" / "public" / "tool-versions.lock.json"
+LIMITS = ROOT / "experiment" / "public" / "limits.json"
 FAULTS = ROOT / "experiment" / "private" / "faults" / "fault_profiles.json"
 AGENT_DEVICE = ROOT / "node_modules" / ".bin" / "agent-device"
 
@@ -87,6 +88,10 @@ def load_task(task_id):
 
 def load_tool_lock():
     return json.loads(TOOL_LOCK.read_text(encoding="utf-8"))
+
+
+def load_limits():
+    return json.loads(LIMITS.read_text(encoding="utf-8"))
 
 
 def load_fault_profile(task):
@@ -436,7 +441,7 @@ def write_manifest(run_dir, manifest):
     return path
 
 
-def execute_codex(task, worktree, run_dir, telemetry):
+def execute_codex(task, worktree, run_dir, telemetry, limits):
     prompt_path = ROOT / task["promptFile"]
     prompt = prompt_path.read_text(encoding="utf-8")
     events_path = run_dir / "codex-events.jsonl"
@@ -453,8 +458,9 @@ def execute_codex(task, worktree, run_dir, telemetry):
     ]
     telemetry.emit("agent_thread_started", tool="codex", promptFile=str(prompt_path), eventsPath=str(events_path), lastMessagePath=str(last_message_path))
     started = time.time()
+    timeout = int(limits.get("processTimeoutSeconds", 7200))
     with events_path.open("w", encoding="utf-8") as events:
-        proc = subprocess.run(cmd, input=prompt, cwd=worktree, text=True, stdout=events, stderr=subprocess.PIPE, timeout=7200)
+        proc = subprocess.run(cmd, input=prompt, cwd=worktree, text=True, stdout=events, stderr=subprocess.PIPE, timeout=timeout)
     telemetry.emit(
         "agent_thread_finished",
         tool="codex",
@@ -474,26 +480,30 @@ def main():
     parser.add_argument("--device-id", default=os.environ.get("LOOPLAB_DEVICE_ID"))
     parser.add_argument("--development-team", default=os.environ.get("LOOPLAB_DEVELOPMENT_TEAM"))
     parser.add_argument("--execute-agent", action="store_true")
+    parser.add_argument("--allow-candidate", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     task = load_task(args.task)
     tool_lock = load_tool_lock()
+    limits = load_limits()
     fault_profile = load_fault_profile(task)
+    if args.condition == "candidate" and not args.allow_candidate:
+        raise SystemExit("candidate condition is reserved until the coordinator is implemented")
     target = args.target or task["target"]
     run_id = f"{args.task}-{args.condition}-{uuid.uuid4().hex[:10]}"
     run_dir = RUNS / run_id
     run_dir.mkdir(parents=True)
     telemetry = Telemetry(run_dir / "telemetry.jsonl")
     source_head = git_head(ROOT)
-    telemetry.emit("run_started", runId=run_id, task=args.task, condition=args.condition, target=target, sourceHead=source_head, toolLock=tool_lock)
+    telemetry.emit("run_started", runId=run_id, task=args.task, condition=args.condition, target=target, sourceHead=source_head, toolLock=tool_lock, limits=limits)
     telemetry.emit("fault_profile_loaded", fault=task.get("fault", "none"), profileId=fault_profile["id"])
 
     backend = None
     try:
         if args.dry_run:
             telemetry.emit("dry_run_complete")
-            manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": source_head, "dryRun": True, "toolLock": tool_lock})
+            manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": source_head, "dryRun": True, "toolLock": tool_lock, "limits": limits})
             print(manifest)
             return
 
@@ -501,7 +511,7 @@ def main():
         backend, backend_url = start_backend(task, run_dir, telemetry, target, fault_profile)
 
         if args.execute_agent:
-            execute_codex(task, worktree, run_dir, telemetry)
+            execute_codex(task, worktree, run_dir, telemetry, limits)
 
         if target == "simulator":
             app = build_simulator(worktree, run_dir, backend_url, telemetry)
@@ -512,7 +522,7 @@ def main():
             device_id = install_launch_iphone(app, backend_url, telemetry, args.device_id, run_dir, fault_profile)
             capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend_url, task, args.development_team, fault_profile)
 
-        manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": source_head, "status": "completed", "toolLock": tool_lock})
+        manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": source_head, "status": "completed", "toolLock": tool_lock, "limits": limits})
         telemetry.emit("run_finished", manifest=str(manifest))
         _, metrics_path = write_metrics(run_dir)
         telemetry.emit("metrics_written", path=str(metrics_path))
@@ -528,6 +538,7 @@ def main():
             "status": "failed",
             "error": str(error),
             "toolLock": tool_lock,
+            "limits": limits,
         })
         _, metrics_path = write_metrics(run_dir)
         telemetry.emit("metrics_written", path=str(metrics_path))

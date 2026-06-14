@@ -51,6 +51,8 @@ def run_task(task_id, condition, args, timeout):
     ]
     if args.execute_agent:
         cmd.append("--execute-agent")
+    if condition == "candidate" and args.allow_candidate:
+        cmd.append("--allow-candidate")
     if args.device_id:
         cmd += ["--device-id", args.device_id]
     if args.development_team:
@@ -69,17 +71,37 @@ def run_task(task_id, condition, args, timeout):
 
 
 def planned_runs(suite, args):
-    condition = args.condition or suite.get("condition") or "baseline"
+    if args.condition:
+        conditions = args.condition
+    elif "conditions" in suite:
+        conditions = suite["conditions"]
+    else:
+        conditions = [suite.get("condition") or "baseline"]
+    if isinstance(conditions, str):
+        conditions = [conditions]
+
     runs_per_task = args.runs_per_task or int(suite.get("runsPerTask", 1))
     task_ids = args.task or suite.get("tasks", [])
     runs = [
         {"taskId": task_id, "condition": condition, "runOrdinal": run_ordinal}
         for task_id in task_ids
+        for condition in conditions
         for run_ordinal in range(1, runs_per_task + 1)
     ]
-    if args.shuffle:
-        random.Random(args.seed).shuffle(runs)
+    should_shuffle = args.shuffle or bool(suite.get("shuffle", False))
+    seed = args.seed if args.seed is not None else int(suite.get("seed", 1))
+    if should_shuffle:
+        random.Random(seed).shuffle(runs)
     return runs
+
+
+def assert_candidate_ready(runs, allow_candidate):
+    has_candidate = any(run["condition"] == "candidate" for run in runs)
+    if has_candidate and not allow_candidate:
+        raise SystemExit(
+            "candidate runs are reserved until the coordinator is implemented; "
+            "use --plan-only to inspect randomized comparison plans"
+        )
 
 
 def summarize_suite(suite_id, suite_dir, run_results):
@@ -116,11 +138,13 @@ def summarize_suite(suite_id, suite_dir, run_results):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--suite", type=Path, default=DEFAULT_SUITE)
-    parser.add_argument("--condition", choices=["baseline", "candidate"])
+    parser.add_argument("--condition", choices=["baseline", "candidate"], action="append")
     parser.add_argument("--task", action="append")
     parser.add_argument("--runs-per-task", type=int)
     parser.add_argument("--shuffle", action="store_true")
-    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--plan-only", action="store_true")
+    parser.add_argument("--allow-candidate", action="store_true")
     parser.add_argument("--execute-agent", action="store_true")
     parser.add_argument("--no-evaluate", action="store_true")
     parser.add_argument("--keep-going", action="store_true")
@@ -133,10 +157,14 @@ def main():
     limits = json.loads(LIMITS.read_text(encoding="utf-8"))
     timeout = int(limits.get("processTimeoutSeconds", 7200))
     runs = planned_runs(suite, args)
+    seed = args.seed if args.seed is not None else int(suite.get("seed", 1))
+    should_shuffle = args.shuffle or bool(suite.get("shuffle", False))
 
     unknown = sorted({run["taskId"] for run in runs if run["taskId"] not in known_tasks})
     if unknown:
         raise SystemExit(f"unknown task ids in suite: {', '.join(unknown)}")
+    if not args.plan_only:
+        assert_candidate_ready(runs, args.allow_candidate)
 
     suite_id = f"{suite.get('id', args.suite.stem)}-{uuid.uuid4().hex[:10]}"
     suite_dir = RUNS / "suites" / suite_id
@@ -145,11 +173,16 @@ def main():
         "suite": suite,
         "runs": runs,
         "limits": limits,
-        "shuffle": args.shuffle,
-        "seed": args.seed,
+        "shuffle": should_shuffle,
+        "seed": seed,
+        "planOnly": args.plan_only,
+        "candidateExecutionAllowed": args.allow_candidate,
         "executeAgent": args.execute_agent,
         "evaluate": not args.no_evaluate,
     })
+    print(suite_dir / "suite-plan.json")
+    if args.plan_only:
+        return
 
     results = []
     for index, run_spec in enumerate(runs, start=1):
