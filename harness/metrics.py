@@ -21,6 +21,91 @@ def load_json(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def event_type(event):
+    return event.get("type") or event.get("event") or event.get("name") or ""
+
+
+def nested_values(value, key_names):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in key_names:
+                yield child
+            yield from nested_values(child, key_names)
+    elif isinstance(value, list):
+        for child in value:
+            yield from nested_values(child, key_names)
+
+
+def as_int(value):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return None
+
+
+def extract_token_usage(events):
+    usage_candidates = []
+    for event in events:
+        for usage in nested_values(event, {"usage", "token_usage", "tokenUsage"}):
+            if isinstance(usage, dict):
+                input_tokens = (
+                    as_int(usage.get("input_tokens"))
+                    or as_int(usage.get("prompt_tokens"))
+                    or as_int(usage.get("inputTokens"))
+                    or as_int(usage.get("promptTokens"))
+                )
+                output_tokens = (
+                    as_int(usage.get("output_tokens"))
+                    or as_int(usage.get("completion_tokens"))
+                    or as_int(usage.get("outputTokens"))
+                    or as_int(usage.get("completionTokens"))
+                )
+                total_tokens = (
+                    as_int(usage.get("total_tokens"))
+                    or as_int(usage.get("totalTokens"))
+                    or ((input_tokens or 0) + (output_tokens or 0) if input_tokens is not None or output_tokens is not None else None)
+                )
+                if input_tokens is not None or output_tokens is not None or total_tokens is not None:
+                    usage_candidates.append({
+                        "inputTokens": input_tokens,
+                        "outputTokens": output_tokens,
+                        "totalTokens": total_tokens,
+                    })
+    return usage_candidates[-1] if usage_candidates else None
+
+
+def summarize_codex_events(run_dir):
+    events_path = Path(run_dir) / "codex-events.jsonl"
+    if not events_path.exists():
+        return {
+            "eventsPath": None,
+            "turnCount": None,
+            "toolCallCount": None,
+            "tokenUsage": None,
+        }
+
+    events = load_jsonl(events_path)
+    type_values = [event_type(event) for event in events]
+    turn_count = sum(1 for value in type_values if "turn" in value and ("completed" in value or "finished" in value))
+    tool_call_count = sum(
+        1
+        for event, value in zip(events, type_values)
+        if "tool_call" in value
+        or "toolCall" in value
+        or value in {"exec_command_begin", "exec_command_started", "command_started"}
+        or any(isinstance(kind, str) and "tool" in kind.lower() for kind in nested_values(event, {"kind", "item_type", "itemType"}))
+    )
+    return {
+        "eventsPath": str(events_path),
+        "turnCount": turn_count,
+        "toolCallCount": tool_call_count,
+        "tokenUsage": extract_token_usage(events),
+    }
+
+
 def command_label(command):
     joined = " ".join(command)
     if command[:2] == ["git", "worktree"]:
@@ -72,6 +157,7 @@ def summarize_run(run_dir):
     run_dir = Path(run_dir)
     manifest = load_json(run_dir / "manifest.json")
     events = load_jsonl(run_dir / "telemetry.jsonl")
+    codex_metrics = summarize_codex_events(run_dir)
     by_event = {}
     for event in events:
         by_event.setdefault(event.get("event"), []).append(event)
@@ -176,9 +262,9 @@ def summarize_run(run_dir):
             "finalTaskCompletion": None,
         },
         "secondary": {
-            "tokenUsage": None,
-            "turnCount": None,
-            "toolCallCount": None,
+            "tokenUsage": codex_metrics["tokenUsage"],
+            "turnCount": codex_metrics["turnCount"],
+            "toolCallCount": codex_metrics["toolCallCount"],
             "processLimitHit": bool(command_timeouts),
             "buildCount": build_count,
             "installCount": install_count,
@@ -197,6 +283,9 @@ def summarize_run(run_dir):
             "exists": evidence_exists,
             "extra": extra_evidence_exists,
             "agentDeviceStateDir": evidence.get("stateDir"),
+        },
+        "agent": {
+            "eventsPath": codex_metrics["eventsPath"],
         },
     }
     return metrics
