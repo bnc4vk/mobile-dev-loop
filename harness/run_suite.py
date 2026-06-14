@@ -20,6 +20,10 @@ LIMITS = ROOT / "experiment" / "public" / "limits.json"
 DEFAULT_SUITE = ROOT / "experiment" / "public" / "suites" / "clean-controls.json"
 
 
+def print_json(payload):
+    print(json.dumps(payload, sort_keys=True), flush=True)
+
+
 def write_json(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -40,7 +44,46 @@ def load_suite(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def run_task(task_id, condition, args, timeout):
+def run_prefix(task_id, condition):
+    return f"{task_id}-{condition}-"
+
+
+def discover_run_dir(task_id, condition, started):
+    candidates = [
+        path
+        for path in RUNS.glob(f"{run_prefix(task_id, condition)}*")
+        if path.is_dir() and path.stat().st_mtime >= started - 1
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def latest_telemetry_event(run_dir):
+    if not run_dir:
+        return None
+    telemetry = run_dir / "telemetry.jsonl"
+    if not telemetry.exists():
+        return None
+    try:
+        lines = [line for line in telemetry.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except OSError:
+        return None
+    if not lines:
+        return None
+    try:
+        event = json.loads(lines[-1])
+    except json.JSONDecodeError:
+        return None
+    return {
+        "event": event.get("event"),
+        "tsMs": event.get("tsMs"),
+        "command": event.get("command"),
+        "tool": event.get("tool"),
+    }
+
+
+def run_task(task_id, condition, args, timeout, suite_id=None, suite_index=None, total_runs=None):
     cmd = [
         sys.executable,
         str(ROOT / "harness" / "run_task.py"),
@@ -59,15 +102,54 @@ def run_task(task_id, condition, args, timeout):
         cmd += ["--development-team", args.development_team]
 
     started = time.time()
-    proc = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
+    print_json({
+        "event": "run_started",
+        "suiteId": suite_id,
+        "suiteIndex": suite_index,
+        "totalRuns": total_runs,
+        "taskId": task_id,
+        "condition": condition,
+        "executeAgent": args.execute_agent,
+    })
+    proc = subprocess.Popen(cmd, cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout = ""
+    stderr = ""
+    heartbeat_seconds = max(1, int(args.heartbeat_seconds))
+    while True:
+        try:
+            out, err = proc.communicate(timeout=heartbeat_seconds)
+            stdout += out or ""
+            stderr += err or ""
+            break
+        except subprocess.TimeoutExpired:
+            elapsed = round(time.time() - started, 3)
+            if elapsed > timeout:
+                proc.kill()
+                out, err = proc.communicate()
+                stdout += out or ""
+                stderr += err or ""
+                raise subprocess.TimeoutExpired(cmd, timeout, output=stdout, stderr=stderr)
+            run_dir = discover_run_dir(task_id, condition, started)
+            print_json({
+                "event": "run_heartbeat",
+                "suiteId": suite_id,
+                "suiteIndex": suite_index,
+                "totalRuns": total_runs,
+                "taskId": task_id,
+                "condition": condition,
+                "elapsedSeconds": elapsed,
+                "runDir": str(run_dir) if run_dir else None,
+                "latestTelemetry": latest_telemetry_event(run_dir),
+            })
     duration = round(time.time() - started, 3)
     manifest_path = None
-    for line in reversed(proc.stdout.splitlines()):
+    for line in reversed(stdout.splitlines()):
         candidate = Path(line.strip())
         if candidate.exists() and candidate.name == "manifest.json":
             manifest_path = candidate
             break
-    return proc, duration, manifest_path
+    completed = subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
+    return completed, duration, manifest_path
 
 
 def planned_runs(suite, args):
@@ -218,6 +300,7 @@ def main():
     parser.add_argument("--execute-agent", action="store_true")
     parser.add_argument("--no-evaluate", action="store_true")
     parser.add_argument("--keep-going", action="store_true")
+    parser.add_argument("--heartbeat-seconds", type=int, default=30)
     parser.add_argument("--device-id", default=os.environ.get("LOOPLAB_DEVICE_ID"))
     parser.add_argument("--development-team", default=os.environ.get("LOOPLAB_DEVELOPMENT_TEAM"))
     args = parser.parse_args()
@@ -250,13 +333,21 @@ def main():
         "executeAgent": args.execute_agent,
         "evaluate": not args.no_evaluate,
     })
-    print(suite_dir / "suite-plan.json")
+    print(suite_dir / "suite-plan.json", flush=True)
     if args.plan_only:
         return
 
     results = []
     for index, run_spec in enumerate(runs, start=1):
-        proc, duration, manifest_path = run_task(run_spec["taskId"], run_spec["condition"], args, timeout)
+        proc, duration, manifest_path = run_task(
+            run_spec["taskId"],
+            run_spec["condition"],
+            args,
+            timeout,
+            suite_id=suite_id,
+            suite_index=index,
+            total_runs=len(runs),
+        )
         run_dir = manifest_path.parent if manifest_path else None
         validation = None
         if proc.returncode == 0 and run_dir and not args.no_evaluate:
@@ -287,13 +378,13 @@ def main():
         }
         append_jsonl(suite_dir / "suite-runs.jsonl", result)
         results.append(result)
-        print(json.dumps(result, sort_keys=True))
+        print_json({"event": "run_completed", **result})
 
         if (not outcome_matched or violations) and not args.keep_going:
             break
 
     summary = summarize_suite(suite_id, suite_dir, suite, known_tasks, results)
-    print(suite_dir / "suite-summary.json")
+    print(suite_dir / "suite-summary.json", flush=True)
     if not summary["allExpectedOutcomesMatched"] or not summary["allLimitsRespected"]:
         sys.exit(1)
 
