@@ -104,22 +104,49 @@ def assert_candidate_ready(runs, allow_candidate):
         )
 
 
-def summarize_suite(suite_id, suite_dir, run_results):
+def actual_outcome(exit_code, validation_passed):
+    if exit_code != 0:
+        return "process-failure"
+    if validation_passed is True:
+        return "oracle-pass"
+    if validation_passed is False:
+        return "validation-failure"
+    return "completed-unvalidated"
+
+
+def task_expected_outcome(task, suite):
+    overrides = suite.get("expectedOutcomes", {})
+    if task["id"] in overrides:
+        return overrides[task["id"]]
+    return task.get("expectedOutcome", "oracle-pass")
+
+
+def summarize_suite(suite_id, suite_dir, suite, known_tasks, run_results):
     rows = []
     passed = 0
     completed = 0
+    expected_matched = 0
     for item in run_results:
         metrics = load_json(Path(item["runDir"]) / "metrics.json") if item.get("runDir") else {}
         validation = load_json(Path(item["runDir"]) / "validation.json") if item.get("runDir") else {}
         flat_metrics = flatten(metrics) if metrics else {}
+        task = known_tasks[item["taskId"]]
+        expected = task_expected_outcome(task, suite)
+        validation_passed = validation.get("passed")
+        actual = actual_outcome(item.get("exitCode"), validation_passed)
+        outcome_matched = actual == expected
         row = {
             **item,
             **flat_metrics,
-            "validationPassed": validation.get("passed"),
+            "expectedOutcome": expected,
+            "actualOutcome": actual,
+            "outcomeMatched": outcome_matched,
+            "validationPassed": validation_passed,
         }
         rows.append(row)
         completed += int(item.get("exitCode") == 0)
-        passed += int(validation.get("passed") is True)
+        passed += int(validation_passed is True)
+        expected_matched += int(outcome_matched)
 
     payload = {
         "suiteId": suite_id,
@@ -127,8 +154,10 @@ def summarize_suite(suite_id, suite_dir, run_results):
         "totalRuns": len(run_results),
         "completedRuns": completed,
         "validatedRuns": passed,
+        "expectedOutcomeMatchedRuns": expected_matched,
         "allCompleted": completed == len(run_results),
         "allValidated": passed == len(run_results),
+        "allExpectedOutcomesMatched": expected_matched == len(run_results),
         "runs": rows,
     }
     write_json(suite_dir / "suite-summary.json", payload)
@@ -191,6 +220,10 @@ def main():
         validation = None
         if proc.returncode == 0 and run_dir and not args.no_evaluate:
             validation = evaluate(run_dir)
+        expected = task_expected_outcome(known_tasks[run_spec["taskId"]], suite)
+        validation_passed = validation.get("passed") if validation else None
+        actual = actual_outcome(proc.returncode, validation_passed)
+        outcome_matched = actual == expected
 
         result = {
             **run_spec,
@@ -202,20 +235,21 @@ def main():
             "manifestPath": str(manifest_path) if manifest_path else None,
             "stdoutTail": proc.stdout[-4000:],
             "stderrTail": proc.stderr[-4000:],
-            "validationPassed": validation.get("passed") if validation else None,
+            "expectedOutcome": expected,
+            "actualOutcome": actual,
+            "outcomeMatched": outcome_matched,
+            "validationPassed": validation_passed,
         }
         append_jsonl(suite_dir / "suite-runs.jsonl", result)
         results.append(result)
         print(json.dumps(result, sort_keys=True))
 
-        if proc.returncode != 0 and not args.keep_going:
-            break
-        if validation and not validation.get("passed") and not args.keep_going:
+        if not outcome_matched and not args.keep_going:
             break
 
-    summary = summarize_suite(suite_id, suite_dir, results)
+    summary = summarize_suite(suite_id, suite_dir, suite, known_tasks, results)
     print(suite_dir / "suite-summary.json")
-    if not summary["allCompleted"] or (not args.no_evaluate and not summary["allValidated"]):
+    if not summary["allExpectedOutcomesMatched"]:
         sys.exit(1)
 
 

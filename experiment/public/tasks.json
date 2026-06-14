@@ -6,6 +6,7 @@
       "fixture": "clean",
       "target": "simulator",
       "fault": "none",
+      "expectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T01-clean-simulator.md"
     },
     {
@@ -14,6 +15,7 @@
       "fixture": "clean",
       "target": "iphone",
       "fault": "none",
+      "expectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T02-clean-iphone.md"
     },
     {
@@ -22,6 +24,7 @@
       "fixture": "clean",
       "target": "simulator",
       "fault": "stale-fixture",
+      "expectedOutcome": "validation-failure",
       "promptFile": "experiment/public/prompts/T03-stale-fixture-simulator.md"
     },
     {
@@ -30,6 +33,7 @@
       "fixture": "clean",
       "target": "simulator",
       "fault": "backend-http-500",
+      "expectedOutcome": "validation-failure",
       "promptFile": "experiment/public/prompts/T04-backend-500-simulator.md"
     },
     {
@@ -38,6 +42,7 @@
       "fixture": "clean",
       "target": "simulator",
       "fault": "broken-automation-runner",
+      "expectedOutcome": "validation-failure",
       "promptFile": "experiment/public/prompts/T05-broken-runner-simulator.md"
     },
     {
@@ -46,6 +51,7 @@
       "fixture": "clean",
       "target": "simulator",
       "fault": "failed-install",
+      "expectedOutcome": "process-failure",
       "promptFile": "experiment/public/prompts/T06-failed-install-simulator.md"
     },
     {
@@ -54,6 +60,7 @@
       "fixture": "clean",
       "target": "simulator",
       "fault": "runtime-kill-after-open",
+      "expectedOutcome": "validation-failure",
       "promptFile": "experiment/public/prompts/T07-runtime-kill-simulator.md"
     },
     {
@@ -62,6 +69,7 @@
       "fixture": "clean",
       "target": "iphone",
       "fault": "none",
+      "expectedOutcome": "oracle-pass",
       "promptFile": "experiment/public/prompts/T08-camera-surface-iphone.md",
       "evidenceScreens": [
         {
@@ -76,6 +84,7 @@
       "fixture": "clean",
       "target": "iphone",
       "fault": "broken-automation-runner",
+      "expectedOutcome": "validation-failure",
       "promptFile": "experiment/public/prompts/T09-broken-runner-iphone.md"
     },
     {
@@ -84,6 +93,7 @@
       "fixture": "clean",
       "target": "iphone",
       "fault": "failed-install",
+      "expectedOutcome": "process-failure",
       "promptFile": "experiment/public/prompts/T10-failed-install-iphone.md"
     }
   ]
