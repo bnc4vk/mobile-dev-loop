@@ -33,6 +33,84 @@
         "127.0.0.1",
         "localhost"
       ]
+    },
+    "T03-stale-fixture-simulator": {
+      "oracle": "scripted-clean-control-v1",
+      "expectedTarget": "simulator",
+      "expectedFixture": "clean",
+      "requiredSnapshotText": [
+        "Clean Account",
+        "Fresh fixture",
+        "alpha",
+        "bravo"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded",
+        "STALE FIXTURE",
+        "old-record"
+      ]
+    },
+    "T04-backend-500-simulator": {
+      "oracle": "scripted-clean-control-v1",
+      "expectedTarget": "simulator",
+      "expectedFixture": "clean",
+      "requiredSnapshotText": [
+        "Clean Account",
+        "Fresh fixture",
+        "alpha",
+        "bravo"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded",
+        "Backend error"
+      ]
+    },
+    "T05-broken-runner-simulator": {
+      "oracle": "scripted-clean-control-v1",
+      "expectedTarget": "simulator",
+      "expectedFixture": "clean",
+      "requiredSnapshotText": [
+        "Clean Account",
+        "Fresh fixture",
+        "alpha",
+        "bravo"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded"
+      ]
+    },
+    "T06-failed-install-simulator": {
+      "oracle": "scripted-clean-control-v1",
+      "expectedTarget": "simulator",
+      "expectedFixture": "clean",
+      "requiredSnapshotText": [
+        "Clean Account",
+        "Fresh fixture",
+        "alpha",
+        "bravo"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded"
+      ]
+    },
+    "T07-runtime-kill-simulator": {
+      "oracle": "scripted-clean-control-v1",
+      "expectedTarget": "simulator",
+      "expectedFixture": "clean",
+      "requiredSnapshotText": [
+        "Clean Account",
+        "Fresh fixture",
+        "alpha",
+        "bravo"
+      ],
+      "forbiddenSnapshotText": [
+        "Unknown",
+        "Not loaded"
+      ]
     }
   }
 }

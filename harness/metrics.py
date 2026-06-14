@@ -37,10 +37,14 @@ def command_label(command):
         return "install"
     if "simctl launch" in joined:
         return "launch"
+    if "simctl terminate" in joined:
+        return "terminate"
     if "devicectl device install app" in joined:
         return "install"
     if "devicectl device process launch" in joined:
         return "launch"
+    if "devicectl device process terminate" in joined:
+        return "terminate"
     if "agent-device" in joined and " prepare ios-runner " in joined:
         return "agent_device_prepare_ios_runner"
     if "agent-device" in joined and " open " in joined:
@@ -139,7 +143,8 @@ def summarize_run(run_dir):
         "target": manifest.get("target"),
         "sourceHead": manifest.get("sourceHead"),
         "toolLock": manifest.get("toolLock", {}),
-        "status": "completed" if finished else "incomplete",
+        "status": "completed" if finished else "failed" if by_event.get("run_failed") else "incomplete",
+        "fault": manifest.get("task", {}).get("fault"),
         "totalSeconds": total_seconds,
         "artifact": {
             "path": artifact.get("path"),
@@ -205,6 +210,7 @@ def flatten(metrics):
         "taskId": metrics.get("taskId"),
         "condition": metrics.get("condition"),
         "target": metrics.get("target"),
+        "fault": metrics.get("fault"),
         "status": metrics.get("status"),
         "totalSeconds": metrics.get("totalSeconds"),
         "artifactSha256": artifact.get("sha256"),

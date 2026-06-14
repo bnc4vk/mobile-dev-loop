@@ -34,6 +34,10 @@ def latest_event(events, event_name):
     return matches[-1] if matches else {}
 
 
+def optional_path(value):
+    return Path(value) if value else None
+
+
 def evaluate(run_dir):
     run_dir = Path(run_dir)
     manifest = load_json(run_dir / "manifest.json")
@@ -65,12 +69,14 @@ def evaluate(run_dir):
 
     evidence = metrics.get("evidence", {})
     paths = evidence.get("paths", {})
-    screenshot_path = Path(paths.get("screenshot") or "")
-    snapshot_path = Path(paths.get("snapshot") or "")
-    check(screenshot_path.exists(), observations, "screenshot evidence exists", {"path": str(screenshot_path)})
-    check(snapshot_path.exists(), observations, "snapshot evidence exists", {"path": str(snapshot_path)})
+    screenshot_path = optional_path(paths.get("screenshot"))
+    snapshot_path = optional_path(paths.get("snapshot"))
+    screenshot_exists = bool(screenshot_path and screenshot_path.is_file())
+    snapshot_exists = bool(snapshot_path and snapshot_path.is_file())
+    check(screenshot_exists, observations, "screenshot evidence exists", {"path": str(screenshot_path) if screenshot_path else None})
+    check(snapshot_exists, observations, "snapshot evidence exists", {"path": str(snapshot_path) if snapshot_path else None})
 
-    snapshot_text = snapshot_path.read_text(encoding="utf-8") if snapshot_path.exists() else ""
+    snapshot_text = snapshot_path.read_text(encoding="utf-8") if snapshot_exists else ""
     for expected in oracle.get("requiredSnapshotText", []):
         check(expected in snapshot_text, observations, "required text appears in snapshot", {"text": expected})
     for forbidden in oracle.get("forbiddenSnapshotText", []):

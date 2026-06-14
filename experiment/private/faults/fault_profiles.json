@@ -1,0 +1,24 @@
+{
+  "profiles": {
+    "stale-fixture": {
+      "description": "Start the backend with the stale fixture even though the task expects clean fixture state.",
+      "backendFixtureOverride": "stale"
+    },
+    "backend-http-500": {
+      "description": "Start the backend in HTTP 500 mode for account requests.",
+      "backendFailure": "http-500"
+    },
+    "broken-automation-runner": {
+      "description": "Pre-seed a busy agent-device iOS runner lease before evidence capture.",
+      "busyAgentDeviceRunnerBeforeEvidence": true
+    },
+    "failed-install": {
+      "description": "Corrupt the built app bundle immediately before installation.",
+      "corruptAppBundleBeforeInstall": true
+    },
+    "runtime-kill-after-open": {
+      "description": "Terminate the app immediately after agent-device opens a session and before screenshot/snapshot evidence.",
+      "terminateAppAfterAgentDeviceOpen": true
+    }
+  }
+}

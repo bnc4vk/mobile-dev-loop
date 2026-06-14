@@ -15,6 +15,46 @@
       "target": "iphone",
       "fault": "none",
       "promptFile": "experiment/public/prompts/T02-clean-iphone.md"
+    },
+    {
+      "id": "T03-stale-fixture-simulator",
+      "title": "Stale fixture simulator fault",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "stale-fixture",
+      "promptFile": "experiment/public/prompts/T03-stale-fixture-simulator.md"
+    },
+    {
+      "id": "T04-backend-500-simulator",
+      "title": "Backend failure simulator fault",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "backend-http-500",
+      "promptFile": "experiment/public/prompts/T04-backend-500-simulator.md"
+    },
+    {
+      "id": "T05-broken-runner-simulator",
+      "title": "Broken automation runner simulator fault",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "broken-automation-runner",
+      "promptFile": "experiment/public/prompts/T05-broken-runner-simulator.md"
+    },
+    {
+      "id": "T06-failed-install-simulator",
+      "title": "Failed install simulator fault",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "failed-install",
+      "promptFile": "experiment/public/prompts/T06-failed-install-simulator.md"
+    },
+    {
+      "id": "T07-runtime-kill-simulator",
+      "title": "Runtime kill simulator fault",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "runtime-kill-after-open",
+      "promptFile": "experiment/public/prompts/T07-runtime-kill-simulator.md"
     }
   ]
 }
