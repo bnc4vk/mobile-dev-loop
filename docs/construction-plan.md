@@ -75,3 +75,13 @@ python3 harness/doctor.py --deep
 The repo pins a local `node@24.14.0` dev dependency so npm scripts and project MCP tooling do not depend on a global Node version.
 
 Project-scoped Codex MCP configuration lives in `.codex/config.toml` and starts XcodeBuildMCP through the local npm package and local pinned Node runtime. The run harness links each fresh executor worktree to the root immutable `node_modules` so the executor sees the same pinned tools without installing mutable dependencies inside each run.
+
+## Experiment Locking
+
+Before any real baseline/candidate comparison run, generate a lock manifest:
+
+```bash
+npm run lock
+```
+
+The lock hashes the SwiftUI app, backend, harness, public task metadata/prompts/suites, private faults/validators, package lock, and tool-version metadata into `runs/locks/experiment-lock.json`. Use `--include-devices` when freezing a hardware-specific execution window. The lock is an experiment artifact, not executor input.

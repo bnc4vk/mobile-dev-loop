@@ -10,6 +10,7 @@
     "doctor": "python3 harness/doctor.py",
     "doctor:deep": "python3 harness/doctor.py --deep",
     "evaluate": "python3 harness/evaluate_run.py",
+    "lock": "python3 harness/lock_experiment.py",
     "metrics": "python3 harness/metrics.py",
     "suite": "python3 harness/run_suite.py",
     "run:simulator": "python3 harness/run_task.py --task T01-clean-simulator --condition baseline",
