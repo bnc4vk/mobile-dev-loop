@@ -8,6 +8,7 @@ Date: 2026-06-12
 - `backend/`: deterministic local mock backend with named fixtures and injectable failures.
 - `experiment/public/`: task prompts, public task metadata, fixed limits, and tool version locks available to executors.
 - `experiment/private/`: hidden validators, expected patch references, and fault-injection controls. These must be excluded from executor worktrees during real runs.
+- `candidate/`: candidate-only coordinator code. Baseline executor worktrees remove this directory before task execution.
 - `harness/`: reusable run harness, passive telemetry, artifact collection, and run-state isolation.
 - `runs/`: generated run artifacts, logs, manifests, screenshots, and telemetry. Ignored by Git.
 - `docs/`: research, design notes, and locked experiment process.

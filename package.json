@@ -10,6 +10,7 @@
     "doctor": "python3 harness/doctor.py",
     "doctor:deep": "python3 harness/doctor.py --deep",
     "evaluate": "python3 harness/evaluate_run.py",
+    "coordinator:inspect": "python3 candidate/coordinator/mobile_coordinator.py",
     "lock": "python3 harness/lock_experiment.py",
     "metrics": "python3 harness/metrics.py",
     "report:baseline": "python3 harness/report_baseline.py",

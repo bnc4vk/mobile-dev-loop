@@ -114,13 +114,17 @@ def load_fault_profile(task):
     return {"id": fault_id, **profiles[fault_id]}
 
 
-def create_worktree(run_dir, telemetry):
+def create_worktree(run_dir, telemetry, condition):
     worktree = run_dir / "worktree"
     run(["git", "worktree", "add", "--detach", str(worktree), "HEAD"], telemetry)
     private_dir = worktree / "experiment" / "private"
     if private_dir.exists():
         shutil.rmtree(private_dir)
         telemetry.emit("private_assets_removed", path=str(private_dir))
+    candidate_dir = worktree / "candidate"
+    if condition == "baseline" and candidate_dir.exists():
+        shutil.rmtree(candidate_dir)
+        telemetry.emit("candidate_assets_removed", path=str(candidate_dir))
     root_node_modules = ROOT / "node_modules"
     worktree_node_modules = worktree / "node_modules"
     if root_node_modules.exists() and not worktree_node_modules.exists():
@@ -515,7 +519,7 @@ def main():
             print(manifest)
             return
 
-        worktree = create_worktree(run_dir, telemetry)
+        worktree = create_worktree(run_dir, telemetry, args.condition)
         backend, backend_url = start_backend(task, run_dir, telemetry, target, fault_profile)
 
         if args.execute_agent:
