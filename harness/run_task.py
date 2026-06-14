@@ -24,6 +24,7 @@ TOOL_LOCK = ROOT / "experiment" / "public" / "tool-versions.lock.json"
 LIMITS = ROOT / "experiment" / "public" / "limits.json"
 FAULTS = ROOT / "experiment" / "private" / "faults" / "fault_profiles.json"
 AGENT_DEVICE = ROOT / "node_modules" / ".bin" / "agent-device"
+LOCAL_NODE_BIN = ROOT / "node_modules" / "node" / "bin"
 
 
 def run(cmd, telemetry, cwd=ROOT, env=None, check=True, timeout=300):
@@ -54,6 +55,13 @@ def run(cmd, telemetry, cwd=ROOT, env=None, check=True, timeout=300):
     if check and proc.returncode != 0:
         raise RuntimeError(f"command failed: {' '.join(cmd)}")
     return proc
+
+
+def repo_tool_env(base=None):
+    env = dict(base or os.environ)
+    if LOCAL_NODE_BIN.exists():
+        env["PATH"] = f"{LOCAL_NODE_BIN}{os.pathsep}{env.get('PATH', '')}"
+    return env
 
 
 def free_port():
@@ -350,7 +358,7 @@ def install_launch_iphone(app, backend_url, telemetry, device_id, run_dir, fault
 
 
 def agent_device_env(target, run_dir, development_team=None):
-    env = os.environ.copy()
+    env = repo_tool_env()
     env.setdefault("AGENT_DEVICE_IOS_RUNNER_LEASE_DIR", str(run_dir / "agent-device-runner-leases"))
     if target == "iphone":
         if development_team:

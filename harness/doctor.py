@@ -10,11 +10,20 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+LOCAL_NODE = ROOT / "node_modules" / "node" / "bin" / "node"
+LOCAL_NODE_BIN = ROOT / "node_modules" / "node" / "bin"
 
 
-def run(cmd, cwd=ROOT, timeout=30):
+def repo_tool_env():
+    env = os.environ.copy()
+    if LOCAL_NODE_BIN.exists():
+        env["PATH"] = f"{LOCAL_NODE_BIN}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
+def run(cmd, cwd=ROOT, timeout=30, env=None):
     try:
-        proc = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, timeout=timeout)
+        proc = subprocess.run(cmd, cwd=cwd, env=env, text=True, capture_output=True, timeout=timeout)
         return {"cmd": cmd, "ok": proc.returncode == 0, "exitCode": proc.returncode, "stdout": proc.stdout.strip(), "stderr": proc.stderr.strip()}
     except Exception as error:
         return {"cmd": cmd, "ok": False, "error": str(error)}
@@ -50,9 +59,11 @@ def main():
     parser.add_argument("--deep", action="store_true", help="Run slower package doctor commands.")
     args = parser.parse_args()
 
-    node_version = run(["node", "--version"])
+    node_cmd = [str(LOCAL_NODE)] if LOCAL_NODE.exists() else ["node"]
+    node_version = run(node_cmd + ["--version"])
     node_semver = semver_tuple(node_version.get("stdout", ""))
     agent_device_required = (22, 19, 0)
+    tool_env = repo_tool_env()
 
     checks = {
         "host": {
@@ -64,7 +75,7 @@ def main():
             "xcodebuild": check_command("xcodebuild", ["xcodebuild"], ["-version"]),
             "xcrun": check_command("xcrun", ["xcrun"], ["--version"]),
             "codex": check_command("codex", ["codex"], ["--version"]),
-            "node": {"available": node_version["ok"], "version": node_version.get("stdout"), "path": shutil.which("node")},
+            "node": {"available": node_version["ok"], "version": node_version.get("stdout"), "path": node_cmd[0]},
             "npm": check_command("npm", ["npm"], ["--version"]),
         },
         "nodeEngine": {
@@ -78,13 +89,13 @@ def main():
                 "expected": "0.17.3",
                 "installed": npm_package_version("agent-device"),
                 "bin": str(ROOT / "node_modules" / ".bin" / "agent-device"),
-                "versionCheck": run([str(ROOT / "node_modules" / ".bin" / "agent-device"), "--version"]),
+                "versionCheck": run([str(ROOT / "node_modules" / ".bin" / "agent-device"), "--version"], env=tool_env),
             },
             "xcodebuildmcp": {
                 "expected": "2.6.2",
                 "installed": npm_package_version("xcodebuildmcp"),
                 "bin": str(ROOT / "node_modules" / ".bin" / "xcodebuildmcp"),
-                "versionCheck": run([str(ROOT / "node_modules" / ".bin" / "xcodebuildmcp"), "--version"]),
+                "versionCheck": run([str(ROOT / "node_modules" / ".bin" / "xcodebuildmcp"), "--version"], env=tool_env),
             },
         },
         "mobile": {
