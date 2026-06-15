@@ -1,0 +1,20 @@
+{
+  "id": "high-value-physical-weighted",
+  "description": "Smaller baseline/candidate comparison with physical-device cases overweighted for coordinator-value diagnosis.",
+  "conditions": [
+    "baseline",
+    "candidate"
+  ],
+  "runsPerTask": 1,
+  "shuffle": true,
+  "seed": 20260615,
+  "tasks": [
+    "T02-clean-iphone",
+    "T08-camera-surface-iphone",
+    "T09-broken-runner-iphone",
+    "T10-failed-install-iphone",
+    "T04-backend-500-simulator",
+    "T05-broken-runner-simulator"
+  ],
+  "evaluate": true
+}

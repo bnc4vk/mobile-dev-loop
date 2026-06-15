@@ -816,15 +816,44 @@ def write_manifest(run_dir, manifest):
     return path
 
 
+def create_executor_tool_wrappers(run_dir):
+    tool_dir = run_dir / "executor-tools"
+    tool_dir.mkdir(parents=True, exist_ok=True)
+    agent_device_state_dir = run_dir / "executor-agent-device-state"
+    wrapper = tool_dir / "agent-device"
+    wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f"REAL_AGENT_DEVICE={str(AGENT_DEVICE)!r}\n"
+        "STATE_DIR=${LOOPLAB_AGENT_DEVICE_STATE_DIR:?LOOPLAB_AGENT_DEVICE_STATE_DIR is required}\n"
+        "for arg in \"$@\"; do\n"
+        "  if [[ \"$arg\" == \"--state-dir\" ]]; then\n"
+        "    exec \"$REAL_AGENT_DEVICE\" \"$@\"\n"
+        "  fi\n"
+        "done\n"
+        "exec \"$REAL_AGENT_DEVICE\" --state-dir \"$STATE_DIR\" \"$@\"\n",
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+    return tool_dir, agent_device_state_dir
+
+
 def execute_codex(task, worktree, run_dir, telemetry, limits, condition):
     prompt_path = ROOT / task["promptFile"]
     prompt = prompt_path.read_text(encoding="utf-8")
     env = repo_tool_env()
+    executor_tool_dir, agent_device_state_dir = create_executor_tool_wrappers(run_dir)
+    env["PATH"] = f"{executor_tool_dir}{os.pathsep}{env.get('PATH', '')}"
+    env["LOOPLAB_AGENT_DEVICE_STATE_DIR"] = str(agent_device_state_dir)
+    env["AGENT_DEVICE_IOS_RUNNER_LEASE_DIR"] = str(run_dir / "executor-agent-device-runner-leases")
     prompt = (
         "You are inside one isolated executor worktree for one experiment task. "
         "Do not run `harness/run_task.py`, `harness/run_suite.py`, `harness/evaluate_run.py`, "
         "or `harness/lock_experiment.py`; those are evaluator-side tools and would create nested or biased runs. "
         "Use the mobile build, install, launch, and observation tools available inside this worktree. "
+        "For `agent-device`, use the `agent-device` command on PATH; it is a run-local wrapper with isolated state. "
+        "Do not call `npx agent-device` or `./node_modules/.bin/agent-device`, because those use shared default state and can leak across runs. "
+        "Use absolute app paths when installing or opening app artifacts. "
         "Make source edits only when needed for the task, and preserve evidence paths in your final response.\n\n"
     ) + prompt
     if condition == "candidate":
@@ -915,6 +944,7 @@ def main():
         if args.execute_agent:
             execute_codex(task, worktree, run_dir, telemetry, limits, args.condition)
 
+        telemetry.emit("independent_validation_started")
         if target == "simulator":
             app = build_simulator(worktree, run_dir, backend_url, telemetry)
             install_recovery = None
@@ -1005,6 +1035,7 @@ def main():
                     success=evidence_capture_trustworthy(evidence),
                 )
 
+        telemetry.emit("independent_validation_finished", trustworthy=evidence_capture_trustworthy(evidence))
         manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": source_head, "status": "completed", "toolLock": tool_lock, "limits": limits})
         telemetry.emit("run_finished", manifest=str(manifest))
         _, metrics_path = write_metrics(run_dir)

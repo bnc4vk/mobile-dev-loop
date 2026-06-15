@@ -9,6 +9,7 @@ import time
 import uuid
 from pathlib import Path
 
+from agent_device_cleanup import terminate_repo_agent_device_daemons
 from evaluate_run import evaluate
 from metrics import flatten, load_json
 
@@ -125,6 +126,25 @@ def latest_codex_event(run_dir):
     return None
 
 
+def emit_agent_device_cleanup(args, phase, suite_id=None, suite_index=None, total_runs=None, task_id=None, condition=None):
+    if args.no_agent_device_cleanup:
+        return None
+    cleanup = terminate_repo_agent_device_daemons()
+    print_json({
+        "event": "agent_device_cleanup",
+        "suiteId": suite_id,
+        "suiteIndex": suite_index,
+        "totalRuns": total_runs,
+        "taskId": task_id,
+        "condition": condition,
+        "phase": phase,
+        "terminated": len(cleanup["terminated"]),
+        "killed": len(cleanup["killed"]),
+        "remaining": len(cleanup["remaining"]),
+    })
+    return cleanup
+
+
 def run_task(task_id, condition, args, timeout, suite_id=None, suite_index=None, total_runs=None):
     cmd = [
         sys.executable,
@@ -144,6 +164,7 @@ def run_task(task_id, condition, args, timeout, suite_id=None, suite_index=None,
         cmd += ["--development-team", args.development_team]
 
     started = time.time()
+    emit_agent_device_cleanup(args, "before_run", suite_id, suite_index, total_runs, task_id, condition)
     print_json({
         "event": "run_started",
         "suiteId": suite_id,
@@ -170,6 +191,7 @@ def run_task(task_id, condition, args, timeout, suite_id=None, suite_index=None,
                 out, err = proc.communicate()
                 stdout += out or ""
                 stderr += err or ""
+                emit_agent_device_cleanup(args, "after_timeout", suite_id, suite_index, total_runs, task_id, condition)
                 raise subprocess.TimeoutExpired(cmd, timeout, output=stdout, stderr=stderr)
             run_dir = discover_run_dir(task_id, condition, started)
             print_json({
@@ -192,6 +214,7 @@ def run_task(task_id, condition, args, timeout, suite_id=None, suite_index=None,
             manifest_path = candidate
             break
     completed = subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
+    emit_agent_device_cleanup(args, "after_run", suite_id, suite_index, total_runs, task_id, condition)
     return completed, duration, manifest_path
 
 
@@ -344,6 +367,7 @@ def main():
     parser.add_argument("--no-evaluate", action="store_true")
     parser.add_argument("--keep-going", action="store_true")
     parser.add_argument("--heartbeat-seconds", type=int, default=30)
+    parser.add_argument("--no-agent-device-cleanup", action="store_true")
     parser.add_argument("--device-id", default=os.environ.get("LOOPLAB_DEVICE_ID"))
     parser.add_argument("--development-team", default=os.environ.get("LOOPLAB_DEVELOPMENT_TEAM"))
     args = parser.parse_args()
@@ -379,6 +403,7 @@ def main():
     print(suite_dir / "suite-plan.json", flush=True)
     if args.plan_only:
         return
+    emit_agent_device_cleanup(args, "before_suite", suite_id=suite_id, total_runs=len(runs))
 
     results = []
     for index, run_spec in enumerate(runs, start=1):

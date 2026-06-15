@@ -165,6 +165,19 @@ def summarize_run(run_dir):
     started = by_event.get("run_started", [{}])[0].get("tsMs")
     finished = by_event.get("run_finished", [{}])[0].get("tsMs")
     total_seconds = round((finished - started) / 1000, 3) if started and finished else None
+    agent_started = by_event.get("agent_thread_started", [{}])[0].get("tsMs")
+    agent_finished_event = by_event.get("agent_thread_finished", [{}])[-1] if by_event.get("agent_thread_finished") else {}
+    agent_finished = agent_finished_event.get("tsMs")
+    validation_started = by_event.get("independent_validation_started", [{}])[-1].get("tsMs") if by_event.get("independent_validation_started") else None
+    validation_finished = by_event.get("independent_validation_finished", [{}])[-1].get("tsMs") if by_event.get("independent_validation_finished") else None
+
+    def seconds_between(start, end):
+        return round((end - start) / 1000, 3) if start and end else None
+
+    setup_seconds = seconds_between(started, agent_started or validation_started)
+    agent_execution_seconds = seconds_between(agent_started, agent_finished)
+    independent_validation_seconds = seconds_between(validation_started, validation_finished or finished)
+    agent_exit_code = agent_finished_event.get("exitCode")
 
     command_metrics = {}
     failed_commands = []
@@ -249,6 +262,12 @@ def summarize_run(run_dir):
         "status": "completed" if finished else "failed" if by_event.get("run_failed") else "incomplete",
         "fault": manifest.get("task", {}).get("fault"),
         "totalSeconds": total_seconds,
+        "phaseTimings": {
+            "setupSeconds": setup_seconds,
+            "agentExecutionSeconds": agent_execution_seconds,
+            "independentValidationSeconds": independent_validation_seconds,
+            "totalRunSeconds": total_seconds,
+        },
         "artifact": {
             "path": artifact.get("path"),
             "sha256": artifact.get("sha256"),
@@ -264,7 +283,11 @@ def summarize_run(run_dir):
             "stateRestorationSuccess": state_restoration_success,
             "automaticEnvironmentRecoverySuccess": automatic_recovery_success,
             "wastedAgentIterationsCausedByInfrastructure": None,
-            "editToTrustworthyObservationSeconds": total_seconds if trustworthy_artifact_validation else None,
+            "editToTrustworthyObservationSeconds": (
+                agent_execution_seconds
+                if trustworthy_artifact_validation and agent_execution_seconds is not None
+                else total_seconds if trustworthy_artifact_validation else None
+            ),
             "unnecessaryBuildsReinstallsResets": None,
             "successfulSimulatorToDeviceEscalation": None,
             "finalTaskCompletion": None,
@@ -273,6 +296,10 @@ def summarize_run(run_dir):
             "tokenUsage": codex_metrics["tokenUsage"],
             "turnCount": codex_metrics["turnCount"],
             "toolCallCount": codex_metrics["toolCallCount"],
+            "agentExitCode": agent_exit_code,
+            "setupSeconds": setup_seconds,
+            "agentExecutionSeconds": agent_execution_seconds,
+            "independentValidationSeconds": independent_validation_seconds,
             "processLimitHit": bool(command_timeouts),
             "buildCount": build_count,
             "installCount": install_count,
@@ -312,6 +339,7 @@ def flatten(metrics):
     secondary = metrics.get("secondary", {})
     artifact = metrics.get("artifact", {})
     device = metrics.get("device", {})
+    phases = metrics.get("phaseTimings", {})
     return {
         "runId": metrics.get("runId"),
         "taskId": metrics.get("taskId"),
@@ -320,6 +348,9 @@ def flatten(metrics):
         "fault": metrics.get("fault"),
         "status": metrics.get("status"),
         "totalSeconds": metrics.get("totalSeconds"),
+        "setupSeconds": phases.get("setupSeconds"),
+        "agentExecutionSeconds": phases.get("agentExecutionSeconds"),
+        "independentValidationSeconds": phases.get("independentValidationSeconds"),
         "artifactSha256": artifact.get("sha256"),
         "deviceId": device.get("id"),
         "trustworthyArtifactValidation": primary.get("trustworthyArtifactValidation"),
