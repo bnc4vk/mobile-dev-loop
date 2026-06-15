@@ -1,0 +1,15 @@
+{
+  "id": "repeat-state-intensive",
+  "description": "Post-pilot repeats for the most stable state-intensive tasks.",
+  "conditions": ["baseline", "candidate"],
+  "runsPerTask": 3,
+  "shuffle": true,
+  "seed": 20260616,
+  "tasks": [
+    "T01-record-selection-persistence-simulator",
+    "T03-foreground-data-refresh-simulator",
+    "T05-offline-cached-account-fallback-simulator",
+    "T06-settings-migration-app-update-simulator"
+  ],
+  "evaluate": true
+}

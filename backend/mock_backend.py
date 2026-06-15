@@ -4,6 +4,7 @@ import json
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 
 class FixtureServer(BaseHTTPRequestHandler):
@@ -13,11 +14,35 @@ class FixtureServer(BaseHTTPRequestHandler):
 
     def do_GET(self):
         print(json.dumps({"event": "request", "client": self.client_address[0], "path": self.path}), flush=True)
-        if self.path == "/health":
+        parsed = urlparse(self.path)
+        if parsed.path == "/health":
             self._send_json({"ok": True, "fixture": self.fixture_name, "failure": self.failure_mode})
             return
 
-        if self.path == "/account":
+        if parsed.path == "/state":
+            self._send_json({"fixture": self.fixture_name, "failure": self.failure_mode})
+            return
+
+        if parsed.path == "/set-state":
+            params = parse_qs(parsed.query)
+            fixture = params.get("fixture", [self.fixture_name])[0]
+            failure = params.get("failure", [self.failure_mode])[0]
+            if fixture not in self.fixtures:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(f"unknown fixture {fixture}".encode("utf-8"))
+                return
+            if failure not in {"none", "http-500"}:
+                self.send_response(400)
+                self.end_headers()
+                self.wfile.write(f"unknown failure {failure}".encode("utf-8"))
+                return
+            type(self).fixture_name = fixture
+            type(self).failure_mode = failure
+            self._send_json({"fixture": self.fixture_name, "failure": self.failure_mode})
+            return
+
+        if parsed.path == "/account":
             if self.failure_mode == "http-500":
                 self.send_response(500)
                 self.end_headers()

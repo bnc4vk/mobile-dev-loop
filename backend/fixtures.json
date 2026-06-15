@@ -20,6 +20,27 @@
     "banner": "STALE FIXTURE",
     "shouldCrash": false
   },
+  "refreshed": {
+    "accountID": "acct-refreshed",
+    "displayName": "Refreshed Account",
+    "records": ["alpha", "bravo", "refreshed"],
+    "banner": "Fresh fixture",
+    "shouldCrash": false
+  },
+  "older": {
+    "accountID": "acct-older",
+    "displayName": "Older account",
+    "records": ["older"],
+    "banner": "older-response",
+    "shouldCrash": false
+  },
+  "newest": {
+    "accountID": "acct-newest",
+    "displayName": "Newest account",
+    "records": ["newest-wins"],
+    "banner": "Fresh fixture",
+    "shouldCrash": false
+  },
   "malformed": {
     "accountID": "acct-crash",
     "displayName": "Crash Account",

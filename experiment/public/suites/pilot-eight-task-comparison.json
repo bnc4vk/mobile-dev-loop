@@ -1,0 +1,19 @@
+{
+  "id": "pilot-eight-task-comparison",
+  "description": "One baseline and one candidate run for each production-code mobile loop task.",
+  "conditions": ["baseline", "candidate"],
+  "runsPerTask": 1,
+  "shuffle": true,
+  "seed": 20260615,
+  "tasks": [
+    "T01-record-selection-persistence-simulator",
+    "T02-cold-start-deep-link-simulator",
+    "T03-foreground-data-refresh-simulator",
+    "T04-out-of-order-request-protection-simulator",
+    "T05-offline-cached-account-fallback-simulator",
+    "T06-settings-migration-app-update-simulator",
+    "T07-malformed-backend-recovery-simulator",
+    "T08-camera-permission-refresh-iphone"
+  ],
+  "evaluate": true
+}

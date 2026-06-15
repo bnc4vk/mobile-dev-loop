@@ -1,173 +1,76 @@
 {
   "tasks": {
-    "T01-clean-simulator": {
-      "oracle": "scripted-clean-control-v1",
+    "T01-record-selection-persistence-simulator": {
+      "oracle": "record-selection-persistence-v1",
       "expectedTarget": "simulator",
-      "expectedFixture": "clean",
-      "requiredSnapshotText": [
-        "Clean Account",
-        "Fresh fixture",
-        "alpha",
-        "bravo"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded"
-      ]
+      "initialOracleExpectedFailure": true,
+      "requiredIntermediateEvents": ["source", "build", "install", "launch", "evidence"],
+      "requiredEvidenceText": ["Selected record", "alpha"],
+      "forbiddenEvidenceText": ["Selected record: none"],
+      "hardcodeForbiddenText": ["Selected record", "alpha"]
     },
-    "T02-clean-iphone": {
-      "oracle": "scripted-clean-control-v1",
+    "T02-cold-start-deep-link-simulator": {
+      "oracle": "cold-start-deep-link-v1",
+      "expectedTarget": "simulator",
+      "initialOracleExpectedFailure": true,
+      "requiredIntermediateEvents": ["source", "build", "install", "launch", "evidence"],
+      "requiredEvidenceText": ["Deep link target", "bravo"],
+      "forbiddenEvidenceText": ["Unknown record", "Deep link target: none"],
+      "hardcodeForbiddenText": ["bravo"]
+    },
+    "T03-foreground-data-refresh-simulator": {
+      "oracle": "foreground-data-refresh-v1",
+      "expectedTarget": "simulator",
+      "initialOracleExpectedFailure": true,
+      "requiredIntermediateEvents": ["source", "backend", "build", "install", "launch", "evidence"],
+      "requiredEvidenceText": ["Fresh fixture", "refreshed"],
+      "forbiddenEvidenceText": ["STALE FIXTURE"],
+      "hardcodeForbiddenText": ["refreshed"]
+    },
+    "T04-out-of-order-request-protection-simulator": {
+      "oracle": "out-of-order-request-protection-v1",
+      "expectedTarget": "simulator",
+      "initialOracleExpectedFailure": true,
+      "requiredIntermediateEvents": ["source", "backend", "build", "install", "launch", "evidence"],
+      "requiredEvidenceText": ["Newest account", "newest-wins"],
+      "forbiddenEvidenceText": ["Older account"],
+      "hardcodeForbiddenText": ["Newest account", "newest-wins"]
+    },
+    "T05-offline-cached-account-fallback-simulator": {
+      "oracle": "offline-cached-account-fallback-v1",
+      "expectedTarget": "simulator",
+      "initialOracleExpectedFailure": true,
+      "requiredIntermediateEvents": ["source", "backend", "build", "install", "launch", "evidence"],
+      "requiredEvidenceText": ["Cached", "Offline", "Clean Account"],
+      "forbiddenEvidenceText": ["Unknown", "Not loaded"],
+      "hardcodeForbiddenText": ["Offline"]
+    },
+    "T06-settings-migration-app-update-simulator": {
+      "oracle": "settings-migration-app-update-v1",
+      "expectedTarget": "simulator",
+      "initialOracleExpectedFailure": true,
+      "requiredIntermediateEvents": ["source", "build", "install", "launch", "evidence"],
+      "requiredEvidenceText": ["Logged in", "on"],
+      "forbiddenEvidenceText": ["uninstall satisfied"],
+      "hardcodeForbiddenText": ["uninstall satisfied"]
+    },
+    "T07-malformed-backend-recovery-simulator": {
+      "oracle": "malformed-backend-recovery-v1",
+      "expectedTarget": "simulator",
+      "initialOracleExpectedFailure": true,
+      "requiredIntermediateEvents": ["source", "backend", "build", "install", "launch", "evidence"],
+      "requiredEvidenceText": ["Recoverable error", "Clean Account"],
+      "forbiddenEvidenceText": ["Fixture requested crash path"],
+      "hardcodeForbiddenText": ["Recoverable error"]
+    },
+    "T08-camera-permission-refresh-iphone": {
+      "oracle": "camera-permission-refresh-v1",
       "expectedTarget": "iphone",
-      "expectedFixture": "clean",
-      "requiredSnapshotText": [
-        "Clean Account",
-        "Fresh fixture",
-        "alpha",
-        "bravo"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded"
-      ],
-      "forbiddenBackendUrlText": [
-        "127.0.0.1",
-        "localhost"
-      ]
-    },
-    "T03-stale-fixture-simulator": {
-      "oracle": "scripted-clean-control-v1",
-      "expectedTarget": "simulator",
-      "expectedFixture": "clean",
-      "requiredSnapshotText": [
-        "Clean Account",
-        "Fresh fixture",
-        "alpha",
-        "bravo"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded",
-        "STALE FIXTURE",
-        "old-record"
-      ]
-    },
-    "T04-backend-500-simulator": {
-      "oracle": "scripted-clean-control-v1",
-      "expectedTarget": "simulator",
-      "expectedFixture": "clean",
-      "requiredSnapshotText": [
-        "Clean Account",
-        "Fresh fixture",
-        "alpha",
-        "bravo"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded",
-        "Backend error"
-      ]
-    },
-    "T05-broken-runner-simulator": {
-      "oracle": "scripted-clean-control-v1",
-      "expectedTarget": "simulator",
-      "expectedFixture": "clean",
-      "requiredSnapshotText": [
-        "Clean Account",
-        "Fresh fixture",
-        "alpha",
-        "bravo"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded"
-      ]
-    },
-    "T06-failed-install-simulator": {
-      "oracle": "scripted-clean-control-v1",
-      "expectedTarget": "simulator",
-      "expectedFixture": "clean",
-      "requiredSnapshotText": [
-        "Clean Account",
-        "Fresh fixture",
-        "alpha",
-        "bravo"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded"
-      ]
-    },
-    "T07-runtime-kill-simulator": {
-      "oracle": "scripted-clean-control-v1",
-      "expectedTarget": "simulator",
-      "expectedFixture": "clean",
-      "requiredSnapshotText": [
-        "Clean Account",
-        "Fresh fixture",
-        "alpha",
-        "bravo"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded"
-      ]
-    },
-    "T08-camera-surface-iphone": {
-      "oracle": "scripted-camera-surface-v1",
-      "expectedTarget": "iphone",
-      "expectedFixture": "clean",
-      "snapshotFile": "agent-device-camera-snapshot.txt",
-      "requiredSnapshotText": [
-        "Camera",
-        "Camera surface ready",
-        "Permission:"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded"
-      ],
-      "forbiddenBackendUrlText": [
-        "127.0.0.1",
-        "localhost"
-      ]
-    },
-    "T09-broken-runner-iphone": {
-      "oracle": "scripted-clean-control-v1",
-      "expectedTarget": "iphone",
-      "expectedFixture": "clean",
-      "requiredSnapshotText": [
-        "Clean Account",
-        "Fresh fixture",
-        "alpha",
-        "bravo"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded"
-      ],
-      "forbiddenBackendUrlText": [
-        "127.0.0.1",
-        "localhost"
-      ]
-    },
-    "T10-failed-install-iphone": {
-      "oracle": "scripted-clean-control-v1",
-      "expectedTarget": "iphone",
-      "expectedFixture": "clean",
-      "requiredSnapshotText": [
-        "Clean Account",
-        "Fresh fixture",
-        "alpha",
-        "bravo"
-      ],
-      "forbiddenSnapshotText": [
-        "Unknown",
-        "Not loaded"
-      ],
-      "forbiddenBackendUrlText": [
-        "127.0.0.1",
-        "localhost"
-      ]
+      "initialOracleExpectedFailure": true,
+      "requiredIntermediateEvents": ["source", "build", "install", "launch", "evidence"],
+      "requiredEvidenceText": ["Camera", "Permission:"],
+      "forbiddenEvidenceText": ["auto prompt"],
+      "hardcodeForbiddenText": ["auto prompt"]
     }
   }
 }

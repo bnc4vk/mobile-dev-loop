@@ -14,6 +14,7 @@ from pathlib import Path
 
 from metrics import write_metrics
 from telemetry import Telemetry, git_head, sha256_path
+from evaluate_run import evaluate
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +25,6 @@ TOOL_LOCK = ROOT / "experiment" / "public" / "tool-versions.lock.json"
 LIMITS = ROOT / "experiment" / "public" / "limits.json"
 FAULTS = ROOT / "experiment" / "private" / "faults" / "fault_profiles.json"
 AGENT_DEVICE = ROOT / "node_modules" / ".bin" / "agent-device"
-COORDINATOR = ROOT / "candidate" / "coordinator" / "mobile_coordinator.py"
 LOCAL_NODE_BIN = ROOT / "node_modules" / "node" / "bin"
 
 
@@ -56,6 +56,11 @@ def run(cmd, telemetry, cwd=ROOT, env=None, check=True, timeout=300):
     if check and proc.returncode != 0:
         raise RuntimeError(f"command failed: {' '.join(cmd)}")
     return proc
+
+
+def write_json(path, payload):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def repo_tool_env(base=None):
@@ -132,223 +137,6 @@ def create_worktree(run_dir, telemetry, condition):
         worktree_node_modules.symlink_to(root_node_modules, target_is_directory=True)
         telemetry.emit("shared_tooling_linked", source=str(root_node_modules), path=str(worktree_node_modules))
     return worktree
-
-
-def coordinator_manifest_path(run_dir):
-    return run_dir / "coordinator_manifest.json"
-
-
-def coordinator_preflight(run_dir, telemetry, task, condition, target, source_head, tool_lock, limits):
-    if condition != "candidate":
-        return None
-    output = coordinator_manifest_path(run_dir)
-    run(
-        [
-            sys.executable,
-            str(COORDINATOR),
-            "preflight",
-            str(run_dir),
-            "--output",
-            str(output),
-            "--condition",
-            condition,
-            "--task-id",
-            task["id"],
-            "--target",
-            target,
-            "--fixture",
-            task["fixture"],
-            "--fault",
-            task.get("fault", "none"),
-            "--source-head",
-            source_head,
-            "--tool-lock-json",
-            json.dumps(tool_lock, sort_keys=True),
-            "--limits-json",
-            json.dumps(limits, sort_keys=True),
-        ],
-        telemetry,
-        timeout=60,
-    )
-    telemetry.emit("coordinator_preflight_written", path=str(output))
-    return output
-
-
-def coordinator_postflight(run_dir, telemetry, condition, check=True):
-    if condition != "candidate":
-        return None
-    output = coordinator_manifest_path(run_dir)
-    proc = run(
-        [
-            sys.executable,
-            str(COORDINATOR),
-            "postflight",
-            str(run_dir),
-            "--output",
-            str(output),
-        ],
-        telemetry,
-        check=check,
-        timeout=60,
-    )
-    if proc.returncode == 0:
-        telemetry.emit("coordinator_postflight_written", path=str(output))
-    return output
-
-
-def coordinator_observation_decision(run_dir, telemetry, condition):
-    if condition != "candidate":
-        return "baseline"
-    output = coordinator_manifest_path(run_dir)
-    run(
-        [
-            sys.executable,
-            str(COORDINATOR),
-            "decide-observation",
-            str(run_dir),
-            "--output",
-            str(output),
-        ],
-        telemetry,
-        timeout=60,
-    )
-    manifest = json.loads(output.read_text(encoding="utf-8"))
-    decision = manifest.get("activeObservationDecision", {})
-    action = decision.get("action") or "relaunch"
-    telemetry.emit("coordinator_observation_decision", path=str(output), action=action, reason=decision.get("reason"))
-    return action
-
-
-def coordinator_recover_runner(run_dir, telemetry, condition, device_id):
-    if condition != "candidate":
-        return None
-    output = coordinator_manifest_path(run_dir)
-    run(
-        [
-            sys.executable,
-            str(COORDINATOR),
-            "recover-runner",
-            str(run_dir),
-            "--output",
-            str(output),
-            "--device-id",
-            device_id,
-        ],
-        telemetry,
-        timeout=60,
-    )
-    manifest = json.loads(output.read_text(encoding="utf-8"))
-    recovery = manifest.get("activeRecovery", {})
-    telemetry.emit(
-        "coordinator_recovery_applied",
-        path=str(output),
-        action=recovery.get("action"),
-        deviceId=device_id,
-        leasePath=recovery.get("leasePath"),
-        leaseRemoved=recovery.get("leaseRemoved"),
-    )
-    return recovery
-
-
-def coordinator_recover_install(run_dir, telemetry, condition, target, error):
-    if condition != "candidate":
-        return None
-    output = coordinator_manifest_path(run_dir)
-    run(
-        [
-            sys.executable,
-            str(COORDINATOR),
-            "recover-install",
-            str(run_dir),
-            "--output",
-            str(output),
-            "--target",
-            target,
-            "--error",
-            str(error),
-        ],
-        telemetry,
-        timeout=60,
-    )
-    manifest = json.loads(output.read_text(encoding="utf-8"))
-    recovery = manifest.get("activeRecovery", {})
-    telemetry.emit(
-        "coordinator_recovery_applied",
-        path=str(output),
-        action=recovery.get("action"),
-        target=target,
-        recommendedTransition=recovery.get("recommendedTransition"),
-    )
-    return recovery
-
-
-def coordinator_recover_runtime(run_dir, telemetry, condition, target, device_id):
-    if condition != "candidate":
-        return None
-    output = coordinator_manifest_path(run_dir)
-    run(
-        [
-            sys.executable,
-            str(COORDINATOR),
-            "recover-runtime",
-            str(run_dir),
-            "--output",
-            str(output),
-            "--target",
-            target,
-            "--device-id",
-            device_id,
-        ],
-        telemetry,
-        timeout=60,
-    )
-    manifest = json.loads(output.read_text(encoding="utf-8"))
-    recovery = manifest.get("activeRecovery", {})
-    telemetry.emit(
-        "coordinator_recovery_applied",
-        path=str(output),
-        action=recovery.get("action"),
-        target=target,
-        deviceId=device_id,
-        recommendedTransition=recovery.get("recommendedTransition"),
-    )
-    return recovery
-
-
-def coordinator_recover_backend(run_dir, telemetry, condition, task, fault_profile):
-    if condition != "candidate":
-        return None
-    output = coordinator_manifest_path(run_dir)
-    run(
-        [
-            sys.executable,
-            str(COORDINATOR),
-            "recover-backend",
-            str(run_dir),
-            "--output",
-            str(output),
-            "--expected-fixture",
-            task["fixture"],
-            "--actual-fixture",
-            fault_profile.get("backendFixtureOverride", task["fixture"]),
-            "--actual-failure",
-            fault_profile.get("backendFailure", "none"),
-        ],
-        telemetry,
-        timeout=60,
-    )
-    manifest = json.loads(output.read_text(encoding="utf-8"))
-    recovery = manifest.get("activeRecovery", {})
-    telemetry.emit(
-        "coordinator_recovery_applied",
-        path=str(output),
-        action=recovery.get("action"),
-        expectedFixture=recovery.get("expectedFixture"),
-        actualFixture=recovery.get("actualFixture"),
-        actualFailure=recovery.get("actualFailure"),
-        recommendedTransition=recovery.get("recommendedTransition"),
-    )
-    return recovery
 
 
 def start_backend(task, run_dir, telemetry, target, fault_profile):
@@ -675,141 +463,6 @@ def capture_agent_device_evidence(run_dir, telemetry, device_id, target, backend
     return event
 
 
-def evidence_capture_trustworthy(evidence):
-    return bool(
-        evidence
-        and evidence.get("openExitCode") == 0
-        and evidence.get("screenshotExitCode") == 0
-        and evidence.get("snapshotExitCode") == 0
-        and evidence.get("screenshot")
-        and Path(evidence["screenshot"]).exists()
-        and evidence.get("snapshot")
-        and Path(evidence["snapshot"]).exists()
-    )
-
-
-def should_recover_runner(condition, fault_profile, evidence):
-    return bool(
-        condition == "candidate"
-        and fault_profile.get("busyAgentDeviceRunnerBeforeEvidence")
-        and not evidence_capture_trustworthy(evidence)
-    )
-
-
-def fault_profile_without_runner_injection(fault_profile):
-    recovered = dict(fault_profile)
-    recovered.pop("busyAgentDeviceRunnerBeforeEvidence", None)
-    recovered["recoveredFromFault"] = fault_profile.get("id")
-    return recovered
-
-
-def should_recover_install(condition, fault_profile):
-    return bool(
-        condition == "candidate"
-        and fault_profile.get("corruptAppBundleBeforeInstall")
-    )
-
-
-def fault_profile_without_install_corruption(fault_profile):
-    recovered = dict(fault_profile)
-    recovered.pop("corruptAppBundleBeforeInstall", None)
-    recovered["recoveredFromFault"] = fault_profile.get("id")
-    return recovered
-
-
-def should_recover_backend(condition, fault_profile):
-    return bool(
-        condition == "candidate"
-        and (
-            fault_profile.get("backendFixtureOverride")
-            or fault_profile.get("backendFailure", "none") != "none"
-        )
-    )
-
-
-def fault_profile_without_backend_fault(fault_profile):
-    recovered = dict(fault_profile)
-    recovered.pop("backendFixtureOverride", None)
-    recovered.pop("backendFailure", None)
-    recovered["recoveredFromFault"] = fault_profile.get("id")
-    return recovered
-
-
-def should_recover_runtime(condition, fault_profile):
-    return bool(
-        condition == "candidate"
-        and fault_profile.get("terminateAppAfterAgentDeviceOpen")
-    )
-
-
-def fault_profile_without_runtime_termination(fault_profile):
-    recovered = dict(fault_profile)
-    recovered.pop("terminateAppAfterAgentDeviceOpen", None)
-    recovered["recoveredFromFault"] = fault_profile.get("id")
-    return recovered
-
-
-def capture_evidence_with_candidate_recovery(run_dir, telemetry, condition, device_id, target, backend_url, task, development_team=None, fault_profile=None, observation_transition="baseline"):
-    evidence = capture_agent_device_evidence(
-        run_dir,
-        telemetry,
-        device_id,
-        target,
-        backend_url,
-        task,
-        development_team=development_team,
-        fault_profile=fault_profile,
-        observation_transition=observation_transition,
-    )
-    if not should_recover_runner(condition, fault_profile or {}, evidence):
-        if not should_recover_runtime(condition, fault_profile or {}):
-            return evidence
-
-        recovery = coordinator_recover_runtime(run_dir, telemetry, condition, target, device_id)
-        retry_profile = fault_profile_without_runtime_termination(fault_profile or {})
-        retry = capture_agent_device_evidence(
-            run_dir,
-            telemetry,
-            device_id,
-            target,
-            backend_url,
-            task,
-            development_team=development_team,
-            fault_profile=retry_profile,
-            observation_transition="relaunch-after-runtime-recovery",
-            recovery_attempt=1,
-        )
-        telemetry.emit(
-            "coordinator_recovery_finished",
-            action=recovery.get("action") if recovery else "recover-runtime",
-            deviceId=device_id,
-            success=evidence_capture_trustworthy(retry),
-        )
-        return retry
-
-    coordinator_recover_runner(run_dir, telemetry, condition, device_id)
-    retry_profile = fault_profile_without_runner_injection(fault_profile or {})
-    retry = capture_agent_device_evidence(
-        run_dir,
-        telemetry,
-        device_id,
-        target,
-        backend_url,
-        task,
-        development_team=development_team,
-        fault_profile=retry_profile,
-        observation_transition="relaunch-after-runner-recovery",
-        recovery_attempt=1,
-    )
-    telemetry.emit(
-        "coordinator_recovery_finished",
-        action="recover-runner",
-        deviceId=device_id,
-        success=evidence_capture_trustworthy(retry),
-    )
-    return retry
-
-
 def write_manifest(run_dir, manifest):
     path = run_dir / "manifest.json"
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
@@ -838,12 +491,30 @@ def create_executor_tool_wrappers(run_dir):
     return tool_dir, agent_device_state_dir
 
 
-def execute_codex(task, worktree, run_dir, telemetry, limits, condition):
+def executor_quickstart(target):
+    target_note = "Use the assigned physical iPhone identifiers from the environment." if target == "iphone" else "Use an available iPhone simulator."
+    return (
+        "Tool quickstart:\n"
+        "- `xcodebuild` builds the iOS app. Use a run-local DerivedData path under the run context directory.\n"
+        "- `xcrun simctl` lists, boots, installs, launches, terminates, and opens URLs for simulators.\n"
+        "- `xcrun devicectl` installs, launches, terminates, and inspects apps on physical iPhones.\n"
+        "- `agent-device` can open an installed app, capture screenshots, capture accessibility snapshots, press controls, and close sessions. "
+        "Use the `agent-device` command on PATH; it is wrapped with run-local state.\n"
+        "- Preserve raw command output, screenshots, snapshots, logs, and final evidence under `LOOPLAB_RUN_CONTEXT_DIR`.\n"
+        f"- {target_note}\n"
+    )
+
+
+def execute_codex(task, worktree, run_dir, telemetry, limits, condition, backend_url):
     prompt_path = ROOT / task["promptFile"]
     prompt = prompt_path.read_text(encoding="utf-8")
     env = repo_tool_env()
     executor_tool_dir, agent_device_state_dir = create_executor_tool_wrappers(run_dir)
     env["PATH"] = f"{executor_tool_dir}{os.pathsep}{env.get('PATH', '')}"
+    run_context_dir = run_dir / "run-context"
+    run_context_dir.mkdir(parents=True, exist_ok=True)
+    env["LOOPLAB_RUN_CONTEXT_DIR"] = str(run_context_dir)
+    env["LOOPLAB_BACKEND_URL"] = backend_url
     env["LOOPLAB_AGENT_DEVICE_STATE_DIR"] = str(agent_device_state_dir)
     env["AGENT_DEVICE_IOS_RUNNER_LEASE_DIR"] = str(run_dir / "executor-agent-device-runner-leases")
     prompt = (
@@ -851,20 +522,21 @@ def execute_codex(task, worktree, run_dir, telemetry, limits, condition):
         "Do not run `harness/run_task.py`, `harness/run_suite.py`, `harness/evaluate_run.py`, "
         "or `harness/lock_experiment.py`; those are evaluator-side tools and would create nested or biased runs. "
         "Use the mobile build, install, launch, and observation tools available inside this worktree. "
-        "For `agent-device`, use the `agent-device` command on PATH; it is a run-local wrapper with isolated state. "
         "Do not call `npx agent-device` or `./node_modules/.bin/agent-device`, because those use shared default state and can leak across runs. "
         "Use absolute app paths when installing or opening app artifacts. "
-        "Make source edits only when needed for the task, and preserve evidence paths in your final response.\n\n"
+        f"The shared run context directory is `{run_context_dir}` and is also available as `LOOPLAB_RUN_CONTEXT_DIR`. "
+        f"The run-local backend endpoint is `{backend_url}` and is also available as `LOOPLAB_BACKEND_URL`.\n\n"
+        f"{executor_quickstart(task['target'])}\n"
     ) + prompt
     if condition == "candidate":
         candidate_bin = worktree / "candidate" / "bin"
         env["PATH"] = f"{candidate_bin}{os.pathsep}{env.get('PATH', '')}"
         prompt = (
-            "Candidate mobile coordinator is available as `mobile-loop` on PATH. "
-            "Prefer `mobile-loop preflight --task {task_id}` and `mobile-loop validate --task {task_id}` "
-            "for mobile build/install/launch/observation/evidence instead of manually recreating the mobile execution loop. "
-            "`mobile-loop` uses public task metadata only; hidden evaluation remains external.\n\n"
-        ).format(task_id=task["id"]) + prompt
+            "Candidate-only tool: `mobile-dev` is available on PATH. It records normalized single-operation results, "
+            "preserves raw provider output by file reference, and answers `mobile-dev status` / `mobile-dev history` from the shared run context. "
+            "It may wrap one provider invocation with `mobile-dev run --operation <name> --provider <tool> -- <command ...>`. "
+            "It does not plan workflows, validate the task, recover faults, or choose rebuild/reinstall/relaunch actions.\n\n"
+        ) + prompt
     events_path = run_dir / "codex-events.jsonl"
     last_message_path = run_dir / "codex-last-message.md"
     cmd = [
@@ -879,7 +551,7 @@ def execute_codex(task, worktree, run_dir, telemetry, limits, condition):
     ]
     telemetry.emit("agent_thread_started", tool="codex", promptFile=str(prompt_path), eventsPath=str(events_path), lastMessagePath=str(last_message_path))
     started = time.time()
-    timeout = int(limits.get("processTimeoutSeconds", 7200))
+    timeout = int(limits.get("processTimeoutSeconds", 600))
     with events_path.open("w", encoding="utf-8") as events:
         proc = subprocess.run(cmd, input=prompt, cwd=worktree, env=env, text=True, stdout=events, stderr=subprocess.PIPE, timeout=timeout)
     telemetry.emit(
@@ -909,8 +581,6 @@ def main():
     tool_lock = load_tool_lock()
     limits = load_limits()
     fault_profile = load_fault_profile(task)
-    if args.condition == "candidate" and not args.allow_candidate:
-        raise SystemExit("candidate condition is reserved until the coordinator is implemented")
     target = args.target or task["target"]
     run_id = f"{args.task}-{args.condition}-{uuid.uuid4().hex[:10]}"
     run_dir = RUNS / run_id
@@ -919,7 +589,6 @@ def main():
     source_head = git_head(ROOT)
     telemetry.emit("run_started", runId=run_id, task=args.task, condition=args.condition, target=target, sourceHead=source_head, toolLock=tool_lock, limits=limits)
     telemetry.emit("fault_profile_loaded", fault=task.get("fault", "none"), profileId=fault_profile["id"])
-    coordinator_preflight(run_dir, telemetry, task, args.condition, target, source_head, tool_lock, limits)
 
     backend = None
     try:
@@ -930,117 +599,41 @@ def main():
             return
 
         worktree = create_worktree(run_dir, telemetry, args.condition)
-        active_fault_profile = fault_profile
-        backend, backend_url = start_backend(task, run_dir, telemetry, target, active_fault_profile)
-        backend_recovery = None
-        if should_recover_backend(args.condition, active_fault_profile):
-            backend_recovery = coordinator_recover_backend(run_dir, telemetry, args.condition, task, active_fault_profile)
-            backend.terminate()
-            backend.wait(timeout=10)
-            telemetry.emit("backend_terminated", pid=backend.pid, reason="coordinator_recovery")
-            active_fault_profile = fault_profile_without_backend_fault(active_fault_profile)
-            backend, backend_url = start_backend(task, run_dir, telemetry, target, active_fault_profile)
+        backend, backend_url = start_backend(task, run_dir, telemetry, target, fault_profile)
+        (run_dir / "run-context").mkdir(parents=True, exist_ok=True)
+        write_json(run_dir / "run-context" / "environment.json", {
+            "schemaVersion": 1,
+            "taskId": task["id"],
+            "condition": args.condition,
+            "target": target,
+            "backendUrl": backend_url,
+            "contextDir": str(run_dir / "run-context"),
+            "worktree": str(worktree),
+            "sourceHead": source_head,
+        })
 
         if args.execute_agent:
-            execute_codex(task, worktree, run_dir, telemetry, limits, args.condition)
+            execute_codex(task, worktree, run_dir, telemetry, limits, args.condition, backend_url)
 
         telemetry.emit("independent_validation_started")
-        if target == "simulator":
-            app = build_simulator(worktree, run_dir, backend_url, telemetry)
-            install_recovery = None
-            try:
-                device_id, _ = install_launch_simulator(app, backend_url, telemetry, run_dir, active_fault_profile)
-            except Exception as error:
-                if not should_recover_install(args.condition, active_fault_profile):
-                    raise
-                install_recovery = coordinator_recover_install(run_dir, telemetry, args.condition, target, error)
-                clear_derived_data(run_dir, telemetry)
-                retry_profile = fault_profile_without_install_corruption(active_fault_profile)
-                active_fault_profile = retry_profile
-                app = build_simulator(worktree, run_dir, backend_url, telemetry)
-                device_id, _ = install_launch_simulator(app, backend_url, telemetry, run_dir, retry_profile)
-            observation_transition = coordinator_observation_decision(run_dir, telemetry, args.condition)
-            if observation_transition == "reuse-observation":
-                evidence = None
-                telemetry.emit("agent_device_evidence_reused", target=target, deviceId=device_id)
-            else:
-                evidence = capture_evidence_with_candidate_recovery(
-                    run_dir,
-                    telemetry,
-                    args.condition,
-                    device_id,
-                    target,
-                    backend_url,
-                    task,
-                    fault_profile=active_fault_profile,
-                    observation_transition=observation_transition,
-                )
-            if backend_recovery:
-                telemetry.emit(
-                    "coordinator_recovery_finished",
-                    action=backend_recovery.get("action"),
-                    deviceId=device_id,
-                    success=evidence_capture_trustworthy(evidence),
-                )
-            if install_recovery:
-                telemetry.emit(
-                    "coordinator_recovery_finished",
-                    action=install_recovery.get("action"),
-                    deviceId=device_id,
-                    success=evidence_capture_trustworthy(evidence),
-                )
-        else:
-            app = build_iphone(worktree, run_dir, backend_url, telemetry, args.device_id, args.development_team)
-            install_recovery = None
-            try:
-                device_id = install_launch_iphone(app, backend_url, telemetry, args.device_id, run_dir, active_fault_profile)
-            except Exception as error:
-                if not should_recover_install(args.condition, active_fault_profile):
-                    raise
-                install_recovery = coordinator_recover_install(run_dir, telemetry, args.condition, target, error)
-                clear_derived_data(run_dir, telemetry)
-                retry_profile = fault_profile_without_install_corruption(active_fault_profile)
-                active_fault_profile = retry_profile
-                app = build_iphone(worktree, run_dir, backend_url, telemetry, args.device_id, args.development_team)
-                device_id = install_launch_iphone(app, backend_url, telemetry, args.device_id, run_dir, retry_profile)
-            observation_transition = coordinator_observation_decision(run_dir, telemetry, args.condition)
-            if observation_transition == "reuse-observation":
-                evidence = None
-                telemetry.emit("agent_device_evidence_reused", target=target, deviceId=device_id)
-            else:
-                evidence = capture_evidence_with_candidate_recovery(
-                    run_dir,
-                    telemetry,
-                    args.condition,
-                    device_id,
-                    target,
-                    backend_url,
-                    task,
-                    development_team=args.development_team,
-                    fault_profile=active_fault_profile,
-                    observation_transition=observation_transition,
-                )
-            if backend_recovery:
-                telemetry.emit(
-                    "coordinator_recovery_finished",
-                    action=backend_recovery.get("action"),
-                    deviceId=device_id,
-                    success=evidence_capture_trustworthy(evidence),
-                )
-            if install_recovery:
-                telemetry.emit(
-                    "coordinator_recovery_finished",
-                    action=install_recovery.get("action"),
-                    deviceId=device_id,
-                    success=evidence_capture_trustworthy(evidence),
-                )
-
-        telemetry.emit("independent_validation_finished", trustworthy=evidence_capture_trustworthy(evidence))
-        manifest = write_manifest(run_dir, {"runId": run_id, "task": task, "condition": args.condition, "target": target, "sourceHead": source_head, "status": "completed", "toolLock": tool_lock, "limits": limits})
+        manifest = write_manifest(run_dir, {
+            "runId": run_id,
+            "task": task,
+            "condition": args.condition,
+            "target": target,
+            "sourceHead": source_head,
+            "status": "completed",
+            "worktree": str(worktree),
+            "runContextDir": str(run_dir / "run-context"),
+            "backendUrl": backend_url,
+            "toolLock": tool_lock,
+            "limits": limits,
+        })
+        validation = evaluate(run_dir)
+        telemetry.emit("independent_validation_finished", passed=validation.get("passed"))
         telemetry.emit("run_finished", manifest=str(manifest))
         _, metrics_path = write_metrics(run_dir)
         telemetry.emit("metrics_written", path=str(metrics_path))
-        coordinator_postflight(run_dir, telemetry, args.condition)
         print(manifest)
     except Exception as error:
         telemetry.emit("run_failed", errorType=type(error).__name__, error=str(error))
@@ -1057,7 +650,6 @@ def main():
         })
         _, metrics_path = write_metrics(run_dir)
         telemetry.emit("metrics_written", path=str(metrics_path))
-        coordinator_postflight(run_dir, telemetry, args.condition, check=False)
         print(manifest)
         raise
     finally:

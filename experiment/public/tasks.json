@@ -1,107 +1,76 @@
 {
   "tasks": [
     {
-      "id": "T01-clean-simulator",
-      "title": "Clean simulator control",
+      "id": "T01-record-selection-persistence-simulator",
+      "title": "Record selection persistence - simulator",
       "fixture": "clean",
       "target": "simulator",
       "fault": "none",
       "expectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T01-clean-simulator.md"
+      "promptFile": "experiment/public/prompts/T01-record-selection-persistence-simulator.md"
     },
     {
-      "id": "T02-clean-iphone",
-      "title": "Clean physical-iPhone control",
+      "id": "T02-cold-start-deep-link-simulator",
+      "title": "Cold-start deep-link navigation - simulator",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "none",
+      "expectedOutcome": "oracle-pass",
+      "promptFile": "experiment/public/prompts/T02-cold-start-deep-link-simulator.md"
+    },
+    {
+      "id": "T03-foreground-data-refresh-simulator",
+      "title": "Foreground data refresh - simulator",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "none",
+      "expectedOutcome": "oracle-pass",
+      "promptFile": "experiment/public/prompts/T03-foreground-data-refresh-simulator.md"
+    },
+    {
+      "id": "T04-out-of-order-request-protection-simulator",
+      "title": "Out-of-order request protection - simulator",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "none",
+      "expectedOutcome": "oracle-pass",
+      "promptFile": "experiment/public/prompts/T04-out-of-order-request-protection-simulator.md"
+    },
+    {
+      "id": "T05-offline-cached-account-fallback-simulator",
+      "title": "Offline cached-account fallback - simulator",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "none",
+      "expectedOutcome": "oracle-pass",
+      "promptFile": "experiment/public/prompts/T05-offline-cached-account-fallback-simulator.md"
+    },
+    {
+      "id": "T06-settings-migration-app-update-simulator",
+      "title": "Settings migration across app update - simulator",
+      "fixture": "clean",
+      "target": "simulator",
+      "fault": "none",
+      "expectedOutcome": "oracle-pass",
+      "promptFile": "experiment/public/prompts/T06-settings-migration-app-update-simulator.md"
+    },
+    {
+      "id": "T07-malformed-backend-recovery-simulator",
+      "title": "Malformed backend recovery - simulator",
+      "fixture": "malformed",
+      "target": "simulator",
+      "fault": "none",
+      "expectedOutcome": "oracle-pass",
+      "promptFile": "experiment/public/prompts/T07-malformed-backend-recovery-simulator.md"
+    },
+    {
+      "id": "T08-camera-permission-refresh-iphone",
+      "title": "Camera-permission refresh - physical iPhone",
       "fixture": "clean",
       "target": "iphone",
       "fault": "none",
       "expectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T02-clean-iphone.md"
-    },
-    {
-      "id": "T03-stale-fixture-simulator",
-      "title": "Stale fixture simulator fault",
-      "fixture": "clean",
-      "target": "simulator",
-      "fault": "stale-fixture",
-      "expectedOutcome": "validation-failure",
-      "candidateExpectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T03-stale-fixture-simulator.md"
-    },
-    {
-      "id": "T04-backend-500-simulator",
-      "title": "Backend failure simulator fault",
-      "fixture": "clean",
-      "target": "simulator",
-      "fault": "backend-http-500",
-      "expectedOutcome": "validation-failure",
-      "candidateExpectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T04-backend-500-simulator.md"
-    },
-    {
-      "id": "T05-broken-runner-simulator",
-      "title": "Broken automation runner simulator fault",
-      "fixture": "clean",
-      "target": "simulator",
-      "fault": "broken-automation-runner",
-      "expectedOutcome": "validation-failure",
-      "candidateExpectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T05-broken-runner-simulator.md"
-    },
-    {
-      "id": "T06-failed-install-simulator",
-      "title": "Failed install simulator fault",
-      "fixture": "clean",
-      "target": "simulator",
-      "fault": "failed-install",
-      "expectedOutcome": "process-failure",
-      "candidateExpectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T06-failed-install-simulator.md"
-    },
-    {
-      "id": "T07-runtime-kill-simulator",
-      "title": "Runtime kill simulator fault",
-      "fixture": "clean",
-      "target": "simulator",
-      "fault": "runtime-kill-after-open",
-      "expectedOutcome": "validation-failure",
-      "candidateExpectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T07-runtime-kill-simulator.md"
-    },
-    {
-      "id": "T08-camera-surface-iphone",
-      "title": "Physical iPhone camera-surface control",
-      "fixture": "clean",
-      "target": "iphone",
-      "fault": "none",
-      "expectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T08-camera-surface-iphone.md",
-      "evidenceScreens": [
-        {
-          "name": "camera",
-          "pressLabel": "Camera"
-        }
-      ]
-    },
-    {
-      "id": "T09-broken-runner-iphone",
-      "title": "Broken automation runner physical-iPhone fault",
-      "fixture": "clean",
-      "target": "iphone",
-      "fault": "broken-automation-runner",
-      "expectedOutcome": "validation-failure",
-      "candidateExpectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T09-broken-runner-iphone.md"
-    },
-    {
-      "id": "T10-failed-install-iphone",
-      "title": "Failed install physical-iPhone fault",
-      "fixture": "clean",
-      "target": "iphone",
-      "fault": "failed-install",
-      "expectedOutcome": "process-failure",
-      "candidateExpectedOutcome": "oracle-pass",
-      "promptFile": "experiment/public/prompts/T10-failed-install-iphone.md"
+      "promptFile": "experiment/public/prompts/T08-camera-permission-refresh-iphone.md"
     }
   ]
 }

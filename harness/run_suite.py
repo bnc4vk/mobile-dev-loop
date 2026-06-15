@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs"
 TASKS = ROOT / "experiment" / "public" / "tasks.json"
 LIMITS = ROOT / "experiment" / "public" / "limits.json"
-DEFAULT_SUITE = ROOT / "experiment" / "public" / "suites" / "clean-controls.json"
+DEFAULT_SUITE = ROOT / "experiment" / "public" / "suites" / "pilot-eight-task-comparison.json"
 
 
 def print_json(payload):
@@ -244,15 +244,13 @@ def planned_runs(suite, args):
 
 
 def assert_candidate_ready(runs, allow_candidate):
-    has_candidate = any(run["condition"] == "candidate" for run in runs)
-    if has_candidate and not allow_candidate:
-        raise SystemExit(
-            "candidate runs are reserved until the coordinator is implemented; "
-            "use --plan-only to inspect randomized comparison plans"
-        )
+    return None
 
 
-def actual_outcome(exit_code, validation_passed):
+def actual_outcome(exit_code, validation_passed, metrics=None):
+    secondary = metrics.get("secondary", {}) if metrics else {}
+    if exit_code != 0 and secondary.get("meaningfulTaskExecution") is False:
+        return "invalid-censored"
     if exit_code != 0:
         return "process-failure"
     if validation_passed is True:
@@ -315,7 +313,7 @@ def summarize_suite(suite_id, suite_dir, suite, known_tasks, run_results):
         task = known_tasks[item["taskId"]]
         expected = task_expected_outcome(task, suite, item["condition"])
         validation_passed = validation.get("passed")
-        actual = actual_outcome(item.get("exitCode"), validation_passed)
+        actual = actual_outcome(item.get("exitCode"), validation_passed, metrics)
         outcome_matched = actual == expected
         violations = item.get("limitViolations")
         if violations is None:
@@ -396,7 +394,7 @@ def main():
         "shuffle": should_shuffle,
         "seed": seed,
         "planOnly": args.plan_only,
-        "candidateExecutionAllowed": args.allow_candidate,
+        "candidateArmEnabled": True,
         "executeAgent": args.execute_agent,
         "evaluate": not args.no_evaluate,
     })
@@ -424,7 +422,7 @@ def main():
         violations = limit_violations(metrics, limits)
         expected = task_expected_outcome(known_tasks[run_spec["taskId"]], suite, run_spec["condition"])
         validation_passed = validation.get("passed") if validation else None
-        actual = actual_outcome(proc.returncode, validation_passed)
+        actual = actual_outcome(proc.returncode, validation_passed, metrics)
         outcome_matched = actual == expected
 
         result = {

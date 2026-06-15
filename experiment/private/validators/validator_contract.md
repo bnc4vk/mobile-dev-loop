@@ -15,7 +15,7 @@ Each validator returns JSON:
 
 ```json
 {
-  "taskId": "T01-clean-simulator",
+  "taskId": "T01-record-selection-persistence-simulator",
   "passed": true,
   "oracle": "human-or-scripted",
   "observations": [],

@@ -156,6 +156,9 @@ def is_tolerated_failure(label, event):
 def summarize_run(run_dir):
     run_dir = Path(run_dir)
     manifest = load_json(run_dir / "manifest.json")
+    context_dir = Path(manifest.get("runContextDir") or run_dir / "run-context")
+    state = load_json(context_dir / "state.json")
+    validation = load_json(run_dir / "validation.json")
     events = load_jsonl(run_dir / "telemetry.jsonl")
     codex_metrics = summarize_codex_events(run_dir)
     by_event = {}
@@ -205,10 +208,32 @@ def summarize_run(run_dir):
             "timeoutSeconds": event.get("timeoutSeconds"),
         })
 
+    context_build = state.get("build", {})
     artifact = by_event.get("artifact_built", [{}])[-1] if by_event.get("artifact_built") else {}
+    if context_build:
+        artifact = {
+            "path": context_build.get("artifactPath"),
+            "sha256": context_build.get("artifactHash"),
+            "platform": context_build.get("platform"),
+        }
     launch = by_event.get("app_launched", [{}])[-1] if by_event.get("app_launched") else {}
+    context_runtime = state.get("runtime", {})
+    if context_runtime:
+        launch = {
+            "target": manifest.get("target"),
+            "deviceId": context_runtime.get("deviceId"),
+            "bundleId": context_runtime.get("bundleId"),
+        }
     evidence = by_event.get("agent_device_evidence_captured", [{}])[-1] if by_event.get("agent_device_evidence_captured") else {}
-    recoveries = by_event.get("coordinator_recovery_finished", [])
+    context_evidence = state.get("evidence", {})
+    if context_evidence:
+        paths = context_evidence.get("paths") or []
+        evidence = {
+            "screenshot": next((path for path in paths if str(path).lower().endswith(".png")), None),
+            "snapshot": next((path for path in paths if str(path).lower().endswith((".txt", ".json"))), None),
+            "paths": paths,
+            "stateDir": str(context_dir),
+        }
 
     evidence_paths = {
         "screenshot": evidence.get("screenshot"),
@@ -228,24 +253,28 @@ def summarize_run(run_dir):
         for item in extra_evidence
     ]
 
-    trustworthy_artifact_validation = bool(
+    freshness = state.get("freshness", {})
+    proven_relationship = bool(
         artifact.get("sha256")
         and launch.get("deviceId")
-        and evidence.get("openExitCode") == 0
-        and evidence.get("screenshotExitCode") == 0
-        and evidence.get("snapshotExitCode") == 0
+        and evidence_paths
         and all(evidence_exists.values())
+        and freshness.get("artifact") == "current"
+        and freshness.get("installation") == "current"
+        and freshness.get("runtime") == "current"
+        and freshness.get("evidence") == "current"
     )
-    automatic_recovery_success = None
-    if recoveries:
-        automatic_recovery_success = any(event.get("success") is True for event in recoveries)
-    backend_recoveries = [event for event in recoveries if event.get("action") == "recover-backend"]
-    state_restoration_success = None
-    if backend_recoveries:
-        state_restoration_success = any(event.get("success") is True for event in backend_recoveries)
+    stale_or_unverifiable_relationships = {
+        key: value
+        for key, value in freshness.items()
+        if value != "current"
+    }
 
     install_count = command_metrics.get("install", {}).get("count", 0)
     build_count = command_metrics.get("build", {}).get("count", 0)
+    launch_count = command_metrics.get("launch", {}).get("count", 0)
+    context_event_count = state.get("counts", {}).get("events", 0)
+    meaningful_task_execution = bool(context_event_count or build_count or install_count or launch_count)
     reset_count = sum(
         1
         for event in by_event.get("command_finished", [])
@@ -279,14 +308,14 @@ def summarize_run(run_dir):
             "name": launch.get("deviceName"),
         },
         "primary": {
-            "trustworthyArtifactValidation": trustworthy_artifact_validation,
-            "stateRestorationSuccess": state_restoration_success,
-            "automaticEnvironmentRecoverySuccess": automatic_recovery_success,
+            "independentTaskCompletion": validation.get("passed"),
+            "provenSourceArtifactRuntimeEvidence": proven_relationship,
+            "staleOrUnverifiableRelationships": stale_or_unverifiable_relationships,
             "wastedAgentIterationsCausedByInfrastructure": None,
-            "editToTrustworthyObservationSeconds": (
+            "editToProvenEvidenceSeconds": (
                 agent_execution_seconds
-                if trustworthy_artifact_validation and agent_execution_seconds is not None
-                else total_seconds if trustworthy_artifact_validation else None
+                if proven_relationship and agent_execution_seconds is not None
+                else total_seconds if proven_relationship else None
             ),
             "unnecessaryBuildsReinstallsResets": None,
             "successfulSimulatorToDeviceEscalation": None,
@@ -297,6 +326,7 @@ def summarize_run(run_dir):
             "turnCount": codex_metrics["turnCount"],
             "toolCallCount": codex_metrics["toolCallCount"],
             "agentExitCode": agent_exit_code,
+            "meaningfulTaskExecution": meaningful_task_execution,
             "setupSeconds": setup_seconds,
             "agentExecutionSeconds": agent_execution_seconds,
             "independentValidationSeconds": independent_validation_seconds,
@@ -318,6 +348,7 @@ def summarize_run(run_dir):
             "exists": evidence_exists,
             "extra": extra_evidence_exists,
             "agentDeviceStateDir": evidence.get("stateDir"),
+            "runContextDir": str(context_dir),
         },
         "agent": {
             "eventsPath": codex_metrics["eventsPath"],
@@ -353,8 +384,8 @@ def flatten(metrics):
         "independentValidationSeconds": phases.get("independentValidationSeconds"),
         "artifactSha256": artifact.get("sha256"),
         "deviceId": device.get("id"),
-        "trustworthyArtifactValidation": primary.get("trustworthyArtifactValidation"),
-        "editToTrustworthyObservationSeconds": primary.get("editToTrustworthyObservationSeconds"),
+        "provenSourceArtifactRuntimeEvidence": primary.get("provenSourceArtifactRuntimeEvidence"),
+        "editToProvenEvidenceSeconds": primary.get("editToProvenEvidenceSeconds"),
         "buildCount": secondary.get("buildCount"),
         "installCount": secondary.get("installCount"),
         "resetCount": secondary.get("resetCount"),

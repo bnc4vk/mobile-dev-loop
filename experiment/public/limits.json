@@ -1,6 +1,5 @@
 {
-  "maxTurns": 30,
-  "maxToolCalls": 160,
-  "maxCostUsd": 25,
-  "processTimeoutSeconds": 7200
+  "maxTurns": 20,
+  "maxToolCalls": 100,
+  "processTimeoutSeconds": 600
 }

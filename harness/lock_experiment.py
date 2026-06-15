@@ -13,8 +13,11 @@ LOCKED_ROOTS = [
     ROOT / "apps" / "LoopLab",
     ROOT / "backend",
     ROOT / "harness",
+    ROOT / "candidate",
     ROOT / "experiment" / "public",
     ROOT / "experiment" / "private",
+    ROOT / "docs",
+    ROOT / "tests",
 ]
 SKIP_NAMES = {
     "__pycache__",

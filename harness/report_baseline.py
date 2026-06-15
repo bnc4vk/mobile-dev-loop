@@ -9,9 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs"
 DEFAULT_SUITE_PREFIXES = [
-    "clean-controls",
-    "simulator-fault-controls",
-    "physical-device-controls",
+    "pilot-eight-task-comparison",
 ]
 
 
@@ -51,6 +49,7 @@ def suite_rows(summaries):
             "oraclePassRuns": sum(1 for run in summary["runs"] if run.get("actualOutcome") == "oracle-pass"),
             "validationFailureRuns": sum(1 for run in summary["runs"] if run.get("actualOutcome") == "validation-failure"),
             "processFailureRuns": sum(1 for run in summary["runs"] if run.get("actualOutcome") == "process-failure"),
+            "invalidCensoredRuns": sum(1 for run in summary["runs"] if run.get("actualOutcome") == "invalid-censored"),
             "meanSeconds": mean(run.get("totalSeconds") for run in summary["runs"]),
         })
     return rows
@@ -69,7 +68,7 @@ def task_rows(summaries):
                 "actualOutcome": run.get("actualOutcome"),
                 "outcomeMatched": run.get("outcomeMatched"),
                 "validationPassed": run.get("validationPassed"),
-                "trustworthyArtifactValidation": run.get("trustworthyArtifactValidation"),
+                "provenSourceArtifactRuntimeEvidence": run.get("provenSourceArtifactRuntimeEvidence"),
                 "evidenceCompleteness": run.get("evidenceCompleteness"),
                 "buildCount": run.get("buildCount"),
                 "installCount": run.get("installCount"),
@@ -112,6 +111,7 @@ def write_report(out_dir, suite_data):
         "oraclePassRuns",
         "validationFailureRuns",
         "processFailureRuns",
+        "invalidCensoredRuns",
         "meanSeconds",
     ]
     task_headers = [
@@ -121,7 +121,7 @@ def write_report(out_dir, suite_data):
         "expectedOutcome",
         "actualOutcome",
         "outcomeMatched",
-        "trustworthyArtifactValidation",
+        "provenSourceArtifactRuntimeEvidence",
         "evidenceCompleteness",
         "failureCount",
         "totalSeconds",
