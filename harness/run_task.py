@@ -15,6 +15,7 @@ from pathlib import Path
 from metrics import write_metrics
 from telemetry import Telemetry, git_head, sha256_path
 from evaluate_run import evaluate
+from local_config import load_local_env
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -566,6 +567,7 @@ def execute_codex(task, worktree, run_dir, telemetry, limits, condition, backend
 
 
 def main():
+    load_local_env()
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", required=True)
     parser.add_argument("--condition", choices=["baseline", "candidate"], required=True)

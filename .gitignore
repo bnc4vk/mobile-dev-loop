@@ -6,3 +6,4 @@ xcuserdata/
 __pycache__/
 *.pyc
 node_modules/
+experiment/local.env

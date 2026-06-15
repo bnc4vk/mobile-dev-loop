@@ -6,6 +6,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from local_config import LOCAL_ENV, load_local_env
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "runs" / "locks" / "experiment-lock.json"
@@ -108,6 +110,8 @@ def hardware_state(include_devices):
     state = {
         "looplabDeviceIdEnvPresent": bool(os.environ.get("LOOPLAB_DEVICE_ID")),
         "looplabDevelopmentTeamEnvPresent": bool(os.environ.get("LOOPLAB_DEVELOPMENT_TEAM")),
+        "localEnvPath": str(LOCAL_ENV),
+        "localEnvPresent": LOCAL_ENV.exists(),
     }
     if include_devices:
         state["devicectlDevices"] = run(["xcrun", "devicectl", "list", "devices"])
@@ -140,6 +144,7 @@ def build_lock(include_devices):
 
 
 def main():
+    load_local_env()
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--include-devices", action="store_true")

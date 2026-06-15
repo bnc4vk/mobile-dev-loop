@@ -68,8 +68,8 @@
       "expectedTarget": "iphone",
       "initialOracleExpectedFailure": true,
       "requiredIntermediateEvents": ["source", "build", "install", "launch", "evidence"],
-      "requiredEvidenceText": ["Camera", "Permission:"],
-      "forbiddenEvidenceText": ["auto prompt"],
+      "requiredEvidenceText": ["Camera", "Permission: denied"],
+      "forbiddenEvidenceText": ["auto prompt", "Would Like to Access the Camera"],
       "hardcodeForbiddenText": ["auto prompt"]
     }
   }

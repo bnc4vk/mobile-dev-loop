@@ -12,13 +12,15 @@ struct AccountState: Codable, Equatable {
 
 @MainActor
 final class AppModel: ObservableObject {
+    private let legacyLoggedInStorageKey = "loggedIn"
+
     @Published var account = AccountState(accountID: "unknown", displayName: "Unknown", records: [], banner: "Not loaded", shouldCrash: false)
     @Published var selectedRecord: String?
     @Published var status = "Ready"
     @Published var deepLinkTarget = "none"
     @Published var cameraPermission = "unknown"
     @Published var cameraSurfaceLabel = "Camera surface ready"
-    @AppStorage("loggedIn") var loggedIn = false
+    @AppStorage("isLoggedIn") var loggedIn = false
 
     private let session = URLSession.shared
 

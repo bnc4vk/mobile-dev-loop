@@ -72,9 +72,14 @@ Public prompts describe user-visible behavior and constraints only. Private vali
 - production app source changes;
 - no validator, fixture, or task-metadata evasion;
 - final artifact built after final source edit;
-- installation/runtime/evidence relationships recorded as current;
+- candidate installation/runtime/evidence relationships recorded as current when `mobile-dev` is available;
+- baseline final-artifact provenance reconstructed from run outputs when no candidate ledger exists;
 - final evidence from that runtime;
 - task-specific hidden evidence and intermediate-state checks.
+
+Simulator validators install the exact final artifact produced by Codex and drive task-specific transitions without rebuilding: relaunch after selection, cold deep link, foreground refresh, deterministic out-of-order responses, offline/live backend transitions, legacy-settings migration state, and malformed-data recovery. These evaluator-side validation actions are written to `mobile-validation.json` and kept separate from agent execution metrics.
+
+The physical iPhone validator installs and launches the exact final signed artifact, opens the Camera tab, grants camera permission through `agent-device settings permission`, backgrounds the app, denies camera permission through the same evaluator-only control surface, returns to LoopLab, and requires the app to show the denied state without an automatic prompt.
 
 ## Limits
 
@@ -107,7 +112,7 @@ Secondary metrics:
 - evidence completeness;
 - cost per successful task when reported.
 
-The metric `provenSourceArtifactRuntimeEvidence` is true only when the ledger proves current source to artifact to installation to runtime to evidence relationships.
+The metric `provenSourceArtifactRuntimeEvidence` is true only when the ledger or reconstructed validation record proves current source to artifact to installation to runtime to evidence relationships. Candidate ledger data is preferred; baseline is not required to emit candidate-specific state.
 
 ## Commands
 
@@ -149,6 +154,8 @@ Physical iPhone runs require:
 export LOOPLAB_DEVICE_ID=<device-udid>
 export LOOPLAB_DEVELOPMENT_TEAM=<team-id>
 ```
+
+The harness also reads these values from `experiment/local.env` when shell variables are not set. The attached iPhone must be unlocked/trusted and able to start XCTest automation; otherwise `agent-device prepare ios-runner` can fail with an automation-mode timeout before the permission oracle reaches the app.
 
 Evaluate or summarize preserved runs:
 

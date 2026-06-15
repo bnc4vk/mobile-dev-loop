@@ -9,6 +9,8 @@ import time
 import uuid
 from pathlib import Path
 
+from local_config import load_local_env
+
 from agent_device_cleanup import terminate_repo_agent_device_daemons
 from evaluate_run import evaluate
 from metrics import flatten, load_json
@@ -352,6 +354,7 @@ def summarize_suite(suite_id, suite_dir, suite, known_tasks, run_results):
 
 
 def main():
+    load_local_env()
     parser = argparse.ArgumentParser()
     parser.add_argument("--suite", type=Path, default=DEFAULT_SUITE)
     parser.add_argument("--condition", choices=["baseline", "candidate"], action="append")
@@ -417,7 +420,8 @@ def main():
         run_dir = manifest_path.parent if manifest_path else None
         validation = None
         if proc.returncode == 0 and run_dir and not args.no_evaluate:
-            validation = evaluate(run_dir)
+            validation_path = run_dir / "validation.json"
+            validation = load_json(validation_path) if validation_path.exists() else evaluate(run_dir)
         metrics = load_json(run_dir / "metrics.json") if run_dir else {}
         violations = limit_violations(metrics, limits)
         expected = task_expected_outcome(known_tasks[run_spec["taskId"]], suite, run_spec["condition"])

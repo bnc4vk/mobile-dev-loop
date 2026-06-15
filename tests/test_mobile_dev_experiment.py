@@ -115,7 +115,16 @@ class MobileDevExperimentTests(unittest.TestCase):
         evaluator = (ROOT / "harness" / "evaluate_run.py").read_text(encoding="utf-8")
         self.assertIn("production source code changed", evaluator)
         self.assertIn("validated artifact was built after the final production source edit", evaluator)
-        self.assertIn("evidence remains current to runtime", evaluator)
+        self.assertIn("baseline is not required to emit candidate ledger/state", evaluator)
+        self.assertIn("validate_simulator_task", evaluator)
+        self.assertIn("set_backend_sequence", evaluator)
+        self.assertIn("direct_permission_result", evaluator)
+        self.assertIn("set_camera_permission_with_settings_ui", evaluator)
+
+    def test_settings_migration_starts_from_renamed_key_bug(self):
+        app_model = (ROOT / "apps" / "LoopLab" / "LoopLab" / "AppModel.swift").read_text(encoding="utf-8")
+        self.assertIn('@AppStorage("isLoggedIn")', app_model)
+        self.assertIn('legacyLoggedInStorageKey = "loggedIn"', app_model)
 
 
 if __name__ == "__main__":

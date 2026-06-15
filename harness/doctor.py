@@ -8,6 +8,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from local_config import LOCAL_ENV, load_local_env
+
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL_NODE = ROOT / "node_modules" / "node" / "bin" / "node"
@@ -54,6 +56,7 @@ def npm_package_version(package_name):
 
 
 def main():
+    loaded_local_env = load_local_env()
     parser = argparse.ArgumentParser()
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--deep", action="store_true", help="Run slower package doctor commands.")
@@ -105,6 +108,9 @@ def main():
         "environment": {
             "LOOPLAB_DEVICE_ID": bool(os.environ.get("LOOPLAB_DEVICE_ID")),
             "LOOPLAB_DEVELOPMENT_TEAM": bool(os.environ.get("LOOPLAB_DEVELOPMENT_TEAM")),
+            "localEnvPath": str(LOCAL_ENV),
+            "localEnvPresent": LOCAL_ENV.exists(),
+            "localEnvLoadedKeys": sorted(loaded_local_env),
         },
     }
 
